@@ -1,54 +1,163 @@
-# Release a tagged build.
+# Publish a release when main moves to an unreleased version.
 #
-# Owncast distributes plugins as a self-contained `.ocpkg` file. There is no CLI
+# Releasing is a merge, not a sequence of commands. A pull request that changes
+# the version in plugin.manifest.json is the release decision; merging it runs
+# this workflow, which tests the merged commit, tags it, and publishes.
+#
+# The tag used to be the *input*, and that is what went wrong on v0.0.4: it was
+# pushed on the commit behind the bump, so it pointed at a manifest that still
+# said 0.0.3 and the run failed its own guard. It is an output now, created from
+# the commit that was just tested, so it cannot drift from the code.
+#
+# Owncast distributes plugins as a self-contained `.ocpkg`. There is no CLI
 # publish step: the public catalog (https://owncast.directory/plugins/submit)
-# takes an uploaded `.ocpkg`, and plugin ownership there is bound to an email
-# login. So this workflow does the part that can be automated —
+# takes an uploaded file and binds ownership to an email login, so that part
+# stays a manual upload. See "Publishing to the catalog" in CONTRIBUTING.md.
 #
-#   test -> package -> verify invariants -> sign provenance -> GitHub release
+# Jobs, in the order they matter:
 #
-# and leaves the catalog submission as one manual upload of the attached file.
-# See "Releasing" in README.md.
-#
-# Trigger by pushing a tag that matches the manifest version:
-#
-#   npm run version:bump patch   # package.json, package-lock.json, manifest
-#   git commit -am "release 0.0.2"   # on a branch, merged by pull request
-#   # after the merge, on main:
-#   git tag v0.0.2 && git push origin v0.0.2
-#
-# `main` is protected, so the version bump lands through a PR and the tag is
-# pushed on its own afterwards. Release tags are protected against deletion and
-# update, which is why the tag is pushed only once its commit is merged.
-#
-# `scripts/check-release.mjs --tag` refuses the run when the tag and
-# plugin.manifest.json disagree, so a mistyped tag cannot publish the wrong
-# version.
+#   detect  -> is this version already released? If so, stop after seconds.
+#   verify  -> test and package the merged commit (verify.yml, shared with CI).
+#   tag     -> create v<version>, refusing if an existing tag points elsewhere.
+#   publish -> download the tested package, attest it, create the release.
 
 name: Release
 
+# The run title cannot contain the version: it is evaluated when the run is
+# created, before anything has read the manifest. The version is in the job
+# names and in the release title instead.
+run-name: "${{ github.event_name == 'workflow_dispatch' && 'Release: manual' || format('Release: {0}', github.ref_name) }}"
+
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+  workflow_dispatch:
 
 # Start from nothing and grant per job, so a compromised step cannot both write
 # a release and mint an attestation.
 permissions: {}
 
 concurrency:
+  # Serialized, not cancelled: a queued run that finds the version already
+  # released does nothing, and cancelling could interrupt a publish.
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
-env:
-  OWNCAST_PLUGIN_HOST_BINARIES_VERSION: v0.11.1
-  NPM_CONFIG_FUND: "false"
-  NPM_CONFIG_AUDIT: "false"
-
 jobs:
-  release:
-    name: Build and publish
+  detect:
+    name: Find the version to release
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release: ${{ steps.state.outputs.release }}
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read the manifest version
+        id: version
+        run: |
+          version="$(node -p "require('./plugin.manifest.json').version")"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "manifest declares ${version}"
+
+      - name: Is this version already released?
+        id: state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "not on main (${GITHUB_REF}); nothing to release"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Gate on the release, not on the tag. A publish that failed after the
+          # tag was created has to stay retryable, and the tag cannot be moved.
+          if gh release view "v${VERSION}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "v${VERSION} is already released; nothing to do"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "v${VERSION} has no release yet"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  verify:
+    name: Verify ${{ needs.detect.outputs.version }}
+    needs: detect
+    if: needs.detect.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.verify.outputs.version }}
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify and package
+        id: verify
+        uses: ./.github/actions/verify
+
+  tag:
+    name: Tag v${{ needs.detect.outputs.version }}
+    needs: [detect, verify]
+    if: needs.detect.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # push the tag
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Credentials have to survive here, unlike every other checkout in this
+          # repository: the job pushes a tag.
+          persist-credentials: true
+
+      - name: Create the tag if it is missing
+        env:
+          TAG: v${{ needs.detect.outputs.version }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "${TAG} already exists; a retry reuses it"
+          else
+            git tag "${TAG}"
+            git push origin "refs/tags/${TAG}"
+          fi
+
+      - name: Confirm the tag points at the tested commit
+        # The case that matters is the retry of a failed publish: it reuses an
+        # existing tag, so this is what stops a stale tag from shipping another
+        # commit's build.
+        env:
+          TAG: v${{ needs.detect.outputs.version }}
+        run: |
+          remote="$(git ls-remote --tags origin "refs/tags/${TAG}" | cut -f1)"
+          if [ "${remote}" != "${GITHUB_SHA}" ]; then
+            echo "::error::${TAG} points at ${remote}, but ${GITHUB_SHA} was tested"
+            exit 1
+          fi
+          echo "${TAG} -> ${remote}"
+
+  publish:
+    name: Publish v${{ needs.detect.outputs.version }}
+    needs: [detect, verify, tag]
+    if: needs.detect.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     permissions:
       contents: write # create the GitHub release
@@ -56,36 +165,17 @@ jobs:
       attestations: write # store the attestation
 
     steps:
-      - name: Check out the tagged commit
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download the tested package
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          persist-credentials: false
-          # Build from the tag's commit, not from whatever main points at.
-          ref: ${{ github.ref }}
+          name: stream-profiles-ocpkg
 
-      - name: Set up Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Verify the tag matches the manifest
-        run: node scripts/check-release.mjs --tag "${GITHUB_REF_NAME}"
-
-      - name: Run scenario tests
-        run: npm test
-
-      - name: Build the installable package
-        run: npm run package
-
-      - name: Verify the built package
-        run: node scripts/check-release.mjs --tag "${GITHUB_REF_NAME}" --package stream-profiles.ocpkg
-
-      - name: Checksum the package
-        run: sha256sum stream-profiles.ocpkg | tee SHA256SUMS.txt
+      - name: Confirm the download is the package that was checked
+        # verify.yml wrote this checksum earlier in the same run. Re-checking it
+        # here is what makes "the released bytes are the tested bytes" true
+        # rather than assumed. download-artifact also verifies its own digest.
+        run: |
+          sha256sum --check --strict SHA256SUMS.txt
 
       - name: Attest build provenance
         # Records which workflow, commit and inputs produced this exact file.
@@ -97,14 +187,13 @@ jobs:
         with:
           subject-path: stream-profiles.ocpkg
 
-      - name: Extract release notes
-        id: notes
-        # The changelog entry for this version, if there is one. Written with
-        # plain shell so no extra action is trusted for it.
+      - name: Write the release notes
+        # Plain shell, so no extra action is trusted with the release body.
+        env:
+          VERSION: ${{ needs.detect.outputs.version }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
           {
-            echo "Owncast plugin package for **stream-profiles ${version}**."
+            echo "Owncast plugin package for **stream-profiles ${VERSION}**."
             echo
             echo "### Install"
             echo
@@ -134,10 +223,11 @@ jobs:
         # action and no PAT: the job's own token is enough.
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: v${{ needs.detect.outputs.version }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" \
+          gh release create "${TAG}" \
             --repo "${GITHUB_REPOSITORY}" \
-            --title "stream-profiles ${GITHUB_REF_NAME}" \
+            --title "stream-profiles ${TAG}" \
             --notes-file release-notes.md \
             --verify-tag \
             stream-profiles.ocpkg \
@@ -146,7 +236,7 @@ jobs:
       - name: Attach build output to the run
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: release-${{ github.ref_name }}
+          name: release-v${{ needs.detect.outputs.version }}
           path: |
             stream-profiles.ocpkg
             SHA256SUMS.txt

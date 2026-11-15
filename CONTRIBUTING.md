@@ -247,3 +247,15 @@ copy rendered inside Owncast. `README.md` points at it - never the reverse.
 It cannot link elsewhere instead: the Instructions tab is rendered inline in the
 admin page, so a relative link 404s and an absolute one navigates the admin away.
 `scripts/check-release.mjs` enforces absolute links there.
+
+## Conventions for an AI assistant
+
+`.github/copilot-instructions.md` and `.github/instructions/` encode the working
+agreements: verify behaviour against Owncast's source rather than its docs, keep
+operator-facing copy free of implementation detail, and treat a widened permission
+set as a user-visible change. `.github/skills/release-plugin/` is the release
+procedure.
+
+They are not documentation of the code — that is this file — so when a convention
+changes, change it in both places in the same commit.
+

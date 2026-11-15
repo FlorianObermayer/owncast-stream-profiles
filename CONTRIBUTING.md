@@ -30,7 +30,7 @@ in CI.
 | `icon.png` / `icon.svg` | Plugin badge |
 | `__tests__/` | Scenario tests |
 | `scripts/check-release.mjs` | Release and security guard |
-| `scripts/set-version.mjs` | Bumps the version in all three files at once |
+| `scripts/set-version.mjs` | Bumps the version in all four files at once |
 | `.github/actions/verify/action.yml` | Test and package steps, shared by CI and the release |
 | `.github/images/` | Screenshots for the README |
 
@@ -96,10 +96,18 @@ command: `main` moving to a version that has no release yet starts
 `.github/workflows/release.yml`, which tests the merged commit, tags it, and
 publishes `stream-profiles.ocpkg` with `SHA256SUMS.txt`.
 
-The version is recorded in three places, and all three must agree:
-`package.json`, `package-lock.json` and `plugin.manifest.json`. Use the script;
+The version is recorded in four places, and all four must agree:
+`package.json`, `package-lock.json`, `plugin.manifest.json`, and the `?v=` query
+on `admin.css`/`admin.js` in `public/admin/index.html`. Use the script;
 `npm version` alone only updates the first two, and the manifest is the one the
 host and the catalog read.
+
+That fourth one is not cosmetic: Owncast serves `.js` and `.css` with a 30-day
+`max-age` (`utils.GetCacheDurationSecondsForPath`), so a browser that has loaded
+the admin page once keeps running that release's script for a month. Without a
+changed URL an upgrade looks like a missing feature, which is exactly how 0.2.0
+appeared to have no admin login. The release guard fails when the query drifts
+from the manifest version.
 
 ```bash
 npm run version:bump patch   # or minor / major / 0.1.0

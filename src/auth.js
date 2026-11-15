@@ -332,14 +332,23 @@ function findMatchingCredential(entries, username, password) {
   if (given === "") return null;
 
   const supplied = text(username);
-  // A named entry can be ruled out by name without hashing anything, which is
-  // the cheap half of the check.
-  const candidates = [];
+
+  // Exact username matches are tried before password-only entries. Both are
+  // legitimate candidates, but an entry that names the viewer must win. Because
+  // a profile shares one salt, two entries with the same password have
+  // identical hashes, so without this ordering an earlier password-only entry
+  // would silently stand in and the viewer would appear in chat as "Guest"
+  // instead of their username.
+  const named = [];
+  const wildcard = [];
+
   for (let i = 0; i < entries.length; i += 1) {
     const entry = entries[i];
-    if (entry.user !== "" && entry.user !== supplied) continue;
-    candidates.push(entry);
+    if (entry.user === "") wildcard.push(entry);
+    else if (entry.user === supplied) named.push(entry);
   }
+
+  const candidates = named.concat(wildcard);
   if (!candidates.length) return null;
 
   // One digest per distinct salt, not per entry. Every credential in a profile

@@ -88,7 +88,7 @@ npm run version:bump patch   # or minor / major / 0.1.0
 npm run release:verify
 git switch -c release/0.0.3
 git commit -am "release 0.0.3"
-git push -u origin HEAD      # then open a PR; main takes no direct pushes
+git push -u origin HEAD      # then open a PR
 ```
 
 `main` is protected: both CI jobs must pass and the branch must be up to date
@@ -102,8 +102,7 @@ git push origin v0.0.3
 ```
 
 Tag after merging, never before. Release tags are protected against deletion and
-update, so a tag pushed early cannot be moved off a pre-merge commit — it can
-only be superseded by the next version.
+update.
 
 `scripts/check-release.mjs` refuses the run when the versions disagree, the tag
 does not match, the permission set changed, an action is not pinned to a commit

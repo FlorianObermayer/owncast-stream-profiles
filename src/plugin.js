@@ -19,10 +19,31 @@
 // Every endpoint below takes { value: ... } under /api/admin and replies with
 // { success, message }, except GET /serverconfig which returns the whole config.
 
-const { definePlugin, owncast } = require("@owncast/plugin-sdk");
+const { definePlugin, owncast, authCheck } = require("@owncast/plugin-sdk");
+
+// base64/utf8Bytes are only used for the admin API's Basic header. Everything
+// else in ./auth backs the viewer gate.
+const {
+  base64,
+  utf8Bytes,
+  findMatchingCredential,
+  hashPassword,
+  newSalt,
+  normalizeCredentials,
+  parseBasicAuthorization,
+  safeReturnTo,
+  summarizeCredentials,
+} = require("./auth");
 
 const PROFILES_KEY = "profiles";
 const ACTIVE_KEY = "active-profile";
+
+// Credentials live beside their profile, never inside it: a profile round-trips
+// through the admin page, and a password hash has no business making that trip.
+const CREDENTIALS_PREFIX = "auth:";
+// Which profile issued a viewer's session, so switching profiles revokes the
+// sessions of the old one instead of letting them ride along.
+const SESSION_PREFIX = "auth-session:";
 
 const AUTOPLAY_MODES = ["off", "always", "sound-only"];
 
@@ -316,46 +337,6 @@ function slugify(value) {
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
   return slug || "profile";
-}
-
-// ---------------------------------------------------------------------------
-// Basic auth helpers
-//
-// The sandbox is QuickJS, not a browser: no btoa. Encode by hand.
-// ---------------------------------------------------------------------------
-
-const BASE64_ALPHABET =
-  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-function utf8Bytes(value) {
-  const encoded = encodeURIComponent(String(value));
-  const bytes = [];
-  for (let i = 0; i < encoded.length; i += 1) {
-    if (encoded[i] === "%") {
-      bytes.push(parseInt(encoded.slice(i + 1, i + 3), 16));
-      i += 2;
-    } else {
-      bytes.push(encoded.charCodeAt(i));
-    }
-  }
-  return bytes;
-}
-
-function base64(bytes) {
-  let out = "";
-  for (let i = 0; i < bytes.length; i += 3) {
-    const b0 = bytes[i];
-    const b1 = i + 1 < bytes.length ? bytes[i + 1] : 0;
-    const b2 = i + 2 < bytes.length ? bytes[i + 2] : 0;
-    out += BASE64_ALPHABET.charAt(b0 >> 2);
-    out += BASE64_ALPHABET.charAt(((b0 & 3) << 4) | (b1 >> 4));
-    out +=
-      i + 1 < bytes.length
-        ? BASE64_ALPHABET.charAt(((b1 & 15) << 2) | (b2 >> 6))
-        : "=";
-    out += i + 2 < bytes.length ? BASE64_ALPHABET.charAt(b2 & 63) : "=";
-  }
-  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -848,6 +829,420 @@ function readServerProfile(password) {
 }
 
 // ---------------------------------------------------------------------------
+// Viewer authentication
+//
+// The active profile decides who may watch. Owncast's host owns the session
+// cookie and calls into this plugin only to decide whether to mint one, so
+// nothing here ever sees or stores a cookie.
+//
+// Owncast grants the `auth.gate` middleware whenever an admin enables this
+// plugin as the gate; the plugin cannot turn it off per request. So the three
+// states have to be deliberate:
+//
+//   no active profile      -> closed, with a page that says why
+//   profile, no credentials -> open: viewers are granted a session silently
+//   profile with credentials -> the login page
+//
+// A native HTTP Basic prompt is not reachable from a plugin: Owncast filters
+// response headers through an allowlist that has no `WWW-Authenticate`, so a
+// 401 challenge never leaves the server. Browsers therefore get a form, and the
+// Authorization header is honoured only when a client sends one unprompted.
+// ---------------------------------------------------------------------------
+
+function credentialsKey(profileId) {
+  return CREDENTIALS_PREFIX + profileId;
+}
+
+function loadCredentials(profileId) {
+  if (!profileId) return [];
+  return normalizeCredentials(owncast.kv.get(credentialsKey(profileId)));
+}
+
+function saveCredentials(profileId, entries) {
+  owncast.kv.set(credentialsKey(profileId), JSON.stringify(entries));
+}
+
+function deleteCredentials(profileId) {
+  owncast.kv.set(credentialsKey(profileId), "");
+}
+
+// Deletes the credentials of any profile that disappeared from the list, so a
+// removed profile cannot keep gating the site from orphaned storage.
+function pruneCredentials(before, after) {
+  const keep = {};
+  for (let i = 0; i < after.length; i += 1) keep[after[i].id] = true;
+  for (let i = 0; i < before.length; i += 1) {
+    if (!keep[before[i].id]) deleteCredentials(before[i].id);
+  }
+}
+
+// The credential set currently in force. `known` is false when no profile is
+// active or the active id no longer names a profile.
+function activeAuth() {
+  const activeId = loadActiveId();
+  if (!activeId) return { profileId: "", entries: [], known: false };
+
+  const exists = loadProfiles().some(function (profile) {
+    return profile.id === activeId;
+  });
+  if (!exists) return { profileId: "", entries: [], known: false };
+
+  return {
+    profileId: activeId,
+    entries: loadCredentials(activeId),
+    known: true,
+  };
+}
+
+function grantAccess(profileId, entry) {
+  // A stable, provider-free identity: one Owncast user per credential rather
+  // than per viewer, which is what a shared password can support.
+  const entryId = entry ? entry.id : "open";
+  const authId = profileId + ":" + entryId;
+  const displayName = entry && entry.user ? entry.user : "Guest";
+
+  const registered = owncast.users.register({
+    authId: authId,
+    displayName: displayName,
+  });
+  const userId =
+    registered && registered.userId ? registered.userId : registered;
+
+  if (!userId) throw new Error("could not register the viewer identity");
+
+  // Recorded before the session exists, so onAuthCheck can never see a session
+  // it cannot attribute to a profile.
+  owncast.kv.set(SESSION_PREFIX + userId, profileId + "|" + entryId);
+  owncast.auth.grantSession({ userId: userId });
+
+  return userId;
+}
+
+function hasSessionBinding(userId) {
+  const binding = owncast.kv.get(SESSION_PREFIX + userId);
+  return typeof binding === "string" ? binding : "";
+}
+
+function redirectTo(location) {
+  return {
+    status: 302,
+    headers: { Location: location, "Cache-Control": "no-store" },
+  };
+}
+
+function htmlResponse(status, body) {
+  return {
+    status: status,
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
+    body: body,
+  };
+}
+
+function plainResponse(status, body) {
+  return {
+    status: status,
+    headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+    body: body,
+  };
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// The gate page is a viewer page, not an admin page, so the host injects no
+// stylesheet into it: everything it needs travels with it.
+function loginPage(options) {
+  const showUsername = Boolean(options.showUsername);
+  const message = options.message
+    ? '<p class="sp-error">' + escapeHtml(options.message) + "</p>"
+    : "";
+
+  const username = showUsername
+    ? '<label>Username<input name="user" autocomplete="username" autocapitalize="none" required></label>'
+    : "";
+
+  return (
+    "<!doctype html><html lang=en><meta charset=utf-8>" +
+    "<meta name=viewport content='width=device-width,initial-scale=1'>" +
+    "<title>Sign in</title>" +
+    "<style>" +
+    ":root{color-scheme:dark}" +
+    "body{margin:0;min-height:100vh;display:grid;place-items:center;" +
+    "background:#0f0f14;color:#efeff1;font:15px/1.5 system-ui,-apple-system,sans-serif}" +
+    "form{width:min(22rem,88vw);display:grid;gap:.85rem;padding:1.6rem;" +
+    "background:#191920;border:1px solid #2c2c36;border-radius:12px}" +
+    "h1{margin:0;font-size:1.15rem;font-weight:600}" +
+    "p{margin:0;color:#b6b3c6;font-size:.9rem}" +
+    ".sp-error{color:#ff8a8a}" +
+    "label{display:grid;gap:.35rem;font-size:.85rem;color:#b6b3c6}" +
+    "input{width:100%;box-sizing:border-box;padding:.6rem .7rem;border-radius:8px;" +
+    "border:1px solid #34343f;background:#101016;color:inherit;font:inherit}" +
+    "input:focus{outline:2px solid #2087e2;outline-offset:1px;border-color:#2087e2}" +
+    "button{margin-top:.35rem;padding:.65rem;border:0;border-radius:8px;font:inherit;" +
+    "font-weight:600;color:#fff;background:#2087e2;cursor:pointer}" +
+    "button:hover{background:#1a72c2}" +
+    "</style>" +
+    "<form method=post>" +
+    "<h1>This stream is private</h1>" +
+    message +
+    username +
+    '<label>Password<input name="password" type="password" ' +
+    'autocomplete="current-password" autofocus required></label>' +
+    '<input type="hidden" name="return_to" value="' +
+    escapeHtml(options.returnTo) +
+    '">' +
+    "<button type=submit>Watch</button>" +
+    "</form></html>"
+  );
+}
+
+function blockedPage(message) {
+  return (
+    "<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>" +
+    "<title>Not available</title>" +
+    "<body style='font:15px/1.5 system-ui,sans-serif;background:#0f0f14;color:#efeff1;" +
+    "display:grid;place-items:center;min-height:100vh;margin:0;text-align:center'>" +
+    "<div style='max-width:26rem;padding:1.5rem'>" +
+    "<h1 style='font-size:1.1rem'>This stream is not available</h1>" +
+    "<p style='color:#b6b3c6'>" +
+    escapeHtml(message) +
+    "</p></div>"
+  );
+}
+
+// Form bodies arrive as raw application/x-www-form-urlencoded text; the host
+// does not parse them and the sandbox has no URLSearchParams.
+function parseFormBody(body) {
+  const out = {};
+  const raw = text(body);
+
+  for (let i = 0; i < raw.length; ) {
+    let end = raw.indexOf("&", i);
+    if (end === -1) end = raw.length;
+    const pair = raw.slice(i, end);
+    i = end + 1;
+    if (pair === "") continue;
+
+    const split = pair.indexOf("=");
+    const key = split === -1 ? pair : pair.slice(0, split);
+    const value = split === -1 ? "" : pair.slice(split + 1);
+
+    try {
+      out[decodeURIComponent(key.replace(/\+/g, " "))] = decodeURIComponent(
+        value.replace(/\+/g, " "),
+      );
+    } catch (error) {
+      // A malformed escape cannot name a field we care about.
+    }
+  }
+
+  return out;
+}
+
+function requestHeader(req, name) {
+  const headers = req.headers || {};
+  const wanted = name.toLowerCase();
+  for (const key in headers) {
+    if (Object.prototype.hasOwnProperty.call(headers, key) && key.toLowerCase() === wanted) {
+      return text(headers[key]);
+    }
+  }
+  return "";
+}
+
+// GET / — where the host sends an unauthenticated viewer. Every branch ends in
+// a session, a form, or an explanation; never a silent pass-through.
+function gateEntry(req) {
+  const auth = activeAuth();
+  const query = req.query || {};
+  const returnTo = safeReturnTo(query.return_to);
+
+  if (!auth.known) {
+    // Closed rather than open: with no profile the operator has expressed no
+    // intent, and opening the site is the wrong guess for a gate.
+    return htmlResponse(
+      200,
+      blockedPage("No profile is active. The owner needs to apply one in the admin."),
+    );
+  }
+
+  if (!auth.entries.length) {
+    try {
+      grantAccess(auth.profileId, null);
+    } catch (error) {
+      owncast.log.error(
+        "stream-profiles: could not open a session: " + describeError(error),
+      );
+      return htmlResponse(503, blockedPage("Could not start a session. Check the server log."));
+    }
+    return redirectTo(returnTo);
+  }
+
+  const authorization = requestHeader(req, "authorization");
+  if (authorization !== "") {
+    const credentials = parseBasicAuthorization(authorization);
+    if (!credentials) {
+      return plainResponse(401, "Expected HTTP Basic credentials.");
+    }
+    const entry = findMatchingCredential(
+      auth.entries,
+      credentials.user,
+      credentials.password,
+    );
+    if (!entry) return plainResponse(401, "Invalid credentials.");
+    try {
+      grantAccess(auth.profileId, entry);
+    } catch (error) {
+      owncast.log.error(
+        "stream-profiles: could not start a session: " + describeError(error),
+      );
+      return plainResponse(503, "Could not start a session.");
+    }
+    return redirectTo(returnTo);
+  }
+
+  return htmlResponse(
+    200,
+    loginPage({
+      returnTo: returnTo,
+      showUsername: auth.entries.some(function (entry) {
+        return entry.user !== "";
+      }),
+    }),
+  );
+}
+
+// POST /auth/login — the only place a password may arrive. Deliberately not
+// GET: a password in a URL ends up in logs, browser history and Referer headers.
+function gateLogin(req) {
+  const auth = activeAuth();
+  const form = parseFormBody(req.body);
+  const returnTo = safeReturnTo(form.return_to);
+
+  if (!auth.known || !auth.entries.length) {
+    return redirectTo(returnTo);
+  }
+
+  const entry = findMatchingCredential(auth.entries, text(form.user), text(form.password));
+  if (!entry) {
+    return htmlResponse(
+      401,
+      loginPage({
+        returnTo: returnTo,
+        message: "That password is not correct.",
+        showUsername: auth.entries.some(function (candidate) {
+          return candidate.user !== "";
+        }),
+      }),
+    );
+  }
+
+  try {
+    grantAccess(auth.profileId, entry);
+  } catch (error) {
+    owncast.log.error(
+      "stream-profiles: could not start a session: " + describeError(error),
+    );
+    return htmlResponse(
+      503,
+      loginPage({
+        returnTo: returnTo,
+        message: "Could not start a session. Check the server log.",
+        showUsername: false,
+      }),
+    );
+  }
+
+  return redirectTo(returnTo);
+}
+
+function gateLogout(req) {
+  const user = req.user;
+  if (user && user.id) owncast.kv.set(SESSION_PREFIX + user.id, "");
+  owncast.auth.endSession();
+  return redirectTo("/");
+}
+
+// Credential management for one profile. Passwords arrive here, are hashed
+// immediately, and are never written back out: the response carries summaries.
+function authAdminAction(body) {
+  const id = text(body.id);
+  const action = text(body.action) || "add";
+
+  const profile = loadProfiles().find(function (candidate) {
+    return candidate.id === id;
+  });
+  if (!profile) {
+    return jsonResponse(404, { error: "Unknown profile: " + (id || "(none)") });
+  }
+
+  let entries = loadCredentials(id);
+
+  if (action === "add") {
+    const user = text(body.user).trim();
+    const password = text(body.password);
+
+    // A colon is Basic auth's separator, so it cannot appear in a username.
+    if (user.indexOf(":") !== -1) {
+      return jsonResponse(400, { error: "A username cannot contain a colon." });
+    }
+    if (password === "") {
+      return jsonResponse(400, { error: "Enter a password." });
+    }
+    const duplicate = entries.some(function (entry) {
+      return user !== "" && entry.user === user;
+    });
+    if (duplicate) {
+      return jsonResponse(400, {
+        error: "That username already exists in this profile.",
+      });
+    }
+
+    // One salt per profile, reused for every credential it holds. That keeps a
+    // check to a single hash regardless of how many entries exist.
+    const salt = entries.length ? entries[0].salt : newSalt();
+    entries = entries.concat([
+      {
+        id: newSalt().slice(0, 16),
+        user: user,
+        salt: salt,
+        hash: hashPassword(password, salt),
+      },
+    ]);
+  } else if (action === "remove") {
+    const entryId = text(body.entryId);
+    entries = entries.filter(function (entry) {
+      return entry.id !== entryId;
+    });
+  } else if (action === "clear") {
+    entries = [];
+  } else {
+    return jsonResponse(400, { error: "Unknown action: " + action });
+  }
+
+  saveCredentials(id, entries);
+  owncast.log.info(
+    "stream-profiles: credentials for \"" +
+      profile.name +
+      "\" " +
+      action +
+      " (" +
+      entries.length +
+      " total)",
+  );
+
+  return jsonResponse(200, {
+    ok: true,
+    credentials: summarizeCredentials(entries),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // HTTP surface
 // ---------------------------------------------------------------------------
 
@@ -878,6 +1273,8 @@ function statePayload() {
 }
 
 // Profiles go to the browser with image presence flags, never with image data.
+// Credentials travel as a summary: usernames and which entries are
+// password-only, never a salt or a hash.
 function profilesForClient(profiles) {
   return profiles.map(function (profile) {
     const out = {};
@@ -886,6 +1283,7 @@ function profilesForClient(profiles) {
     }
     out.logo = Boolean(loadImage(profile.id, "logo"));
     out.favicon = Boolean(loadImage(profile.id, "favicon"));
+    out.credentials = summarizeCredentials(loadCredentials(profile.id));
     return out;
   });
 }
@@ -909,8 +1307,49 @@ module.exports = definePlugin({
   onHttpRequest(req) {
     const path = typeof req.path === "string" ? req.path : "";
 
+    // Viewer gate first: these are the only paths a visitor reaches without a
+    // session, and they must not collide with the admin surface below.
+    if (req.method === "GET" && (path === "/" || path === "")) {
+      return gateEntry(req);
+    }
+
+    // The form posts back to the URL that rendered it, with no `action`, so the
+    // plugin does not have to guess whether the host stripped a trailing slash.
+    // `/auth/login` stays as a stable endpoint for scripts and tests.
+    if (req.method === "POST" && (path === "/" || path === "")) {
+      return gateLogin(req);
+    }
+
+    if (req.method === "POST" && path === "/auth/login") {
+      return gateLogin(req);
+    }
+
+    if (req.method === "GET" && path === "/auth/logout") {
+      return gateLogout(req);
+    }
+
     if (req.method === "GET" && path === "/admin/api/state") {
       return jsonResponse(200, statePayload());
+    }
+
+    // Credentials for one profile. The host already gates /admin/*, so no
+    // admin password is involved here.
+    if (req.method === "GET" && path === "/admin/api/auth") {
+      const query = req.query || {};
+      const id = typeof query.id === "string" ? query.id : "";
+      const known = loadProfiles().some(function (profile) {
+        return profile.id === id;
+      });
+      if (!known) {
+        return jsonResponse(404, { error: "Unknown profile: " + (id || "(none)") });
+      }
+      return jsonResponse(200, {
+        credentials: summarizeCredentials(loadCredentials(id)),
+      });
+    }
+
+    if (req.method === "POST" && path === "/admin/api/auth") {
+      return authAdminAction(parseBody(req.body) || {});
     }
 
     if (req.method === "POST" && path === "/admin/api/profiles") {
@@ -928,6 +1367,7 @@ module.exports = definePlugin({
         : "";
 
       pruneImages(loadProfiles(), profiles);
+      pruneCredentials(loadProfiles(), profiles);
       owncast.kv.set(PROFILES_KEY, JSON.stringify(profiles));
       owncast.kv.set(ACTIVE_KEY, activeId);
 
@@ -1025,5 +1465,36 @@ module.exports = definePlugin({
     }
 
     return jsonResponse(404, { error: "Not found" });
+  },
+
+  // Called by the host on a viewer's page load, for the active gate plugin
+  // only. Fails closed: an unreadable session is ended, not honoured.
+  onAuthCheck(req) {
+    const auth = activeAuth();
+
+    if (!auth.known) {
+      return authCheck.deny("no profile is active");
+    }
+
+    // An open profile has nothing to revoke; keep whatever session exists.
+    if (!auth.entries.length) return authCheck.ok();
+
+    const user = req && req.user;
+    if (!user || !user.id) return authCheck.deny("no viewer identity");
+
+    const binding = hasSessionBinding(user.id);
+    if (binding === "") return authCheck.deny("session does not belong to a profile");
+
+    const parts = binding.split("|");
+    if (parts[0] !== auth.profileId) {
+      return authCheck.deny("a different profile is active");
+    }
+
+    const stillExists = auth.entries.some(function (entry) {
+      return entry.id === parts[1];
+    });
+    if (!stillExists) return authCheck.deny("that credential was removed");
+
+    return authCheck.ok();
   },
 });

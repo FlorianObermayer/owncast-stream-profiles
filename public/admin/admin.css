@@ -145,6 +145,35 @@
   opacity: 0.7;
 }
 
+/* Viewer access. Set apart from the profile fields because it is the only part
+   of a profile that changes who can reach the site. */
+.sp-access {
+  margin-top: 22px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(127, 127, 127, 0.25);
+}
+
+.sp-access > .sp-hint {
+  margin: 4px 0 12px;
+}
+
+.sp-access-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.sp-access-entry {
+  align-items: center;
+  gap: 10px;
+}
+
+.sp-access-form input {
+  flex: 1 1 10rem;
+  min-width: 8rem;
+}
+
 .sp-banner {
   padding: 8px 12px;
   margin-bottom: 16px;

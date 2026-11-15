@@ -12,6 +12,7 @@
 // runs this before it trusts anything else.
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join } from "node:path";
 import { inflateRawSync } from "node:zlib";
 
@@ -19,13 +20,21 @@ const ROOT = process.cwd();
 
 // The exact capability set an admin approved. Widening this is a deliberate,
 // reviewable act — which is the whole point of the file.
-const EXPECTED_PERMISSIONS = ["http.serve", "storage.kv", "network.fetch"];
+const EXPECTED_PERMISSIONS = [
+  "http.serve",
+  "storage.kv",
+  "network.fetch",
+  // Per-profile viewer credentials: the plugin becomes the site's login gate.
+  "auth.gate",
+  "users.register",
+];
 
 const REQUIRED_FILES = [
   "plugin.manifest.json",
   "package.json",
   "package-lock.json",
   "src/plugin.js",
+  "src/auth.js",
   "public/admin/index.html",
   "public/admin/admin.js",
   "public/admin/admin.css",
@@ -450,6 +459,58 @@ function readNestedJson(packagePath, wanted) {
 }
 
 // ---------------------------------------------------------------------------
+// Password hashing
+//
+// src/auth.js hand-writes SHA-256 because the plugin sandbox has no crypto. A
+// subtle mistake there would not fail loudly: every credential would simply
+// stop matching, locking viewers out of a site the admin thinks is open. These
+// are the FIPS 180-4 vectors for the empty string and "abc", plus both message
+// padding boundaries.
+// ---------------------------------------------------------------------------
+
+const SHA256_VECTORS = [
+  ["", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"],
+  ["abc", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"],
+  [
+    "a".repeat(55),
+    "9f4390f8d30c2dd92ec9f095b65e2b9ae9b0a925a5258e241c9f1e910f734318",
+  ],
+  [
+    "a".repeat(56),
+    "b35439a4ac6f0948b6d6f9e3c6af0f5f590ce20f1bde7090ef7970686ec6738a",
+  ],
+];
+
+function checkPasswordHashing() {
+  const modulePath = join(ROOT, "src", "auth.js");
+  if (!existsSync(modulePath)) return; // checkRequiredFiles already reported it
+
+  let auth;
+  try {
+    auth = createRequire(import.meta.url)(modulePath);
+  } catch (error) {
+    fail(`src/auth.js cannot be loaded: ${error.message}`);
+    return;
+  }
+
+  for (const [input, expected] of SHA256_VECTORS) {
+    const actual = auth.sha256Hex(input);
+    if (actual !== expected) {
+      fail(
+        `src/auth.js computes the wrong SHA-256 for a ${input.length}-byte input ` +
+          `(${actual}); stored passwords would never match.`,
+      );
+    }
+  }
+
+  // A hash must depend on the salt, or every profile would share one digest.
+  const password = "correct horse battery staple";
+  if (auth.hashPassword(password, "salt-one") === auth.hashPassword(password, "salt-two")) {
+    fail("src/auth.js hashes ignore the salt");
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -459,6 +520,7 @@ function main() {
   checkRequiredFiles();
   checkInstructionsLinks();
   checkWorkflowsPinned();
+  checkPasswordHashing();
   checkTag(args.tag, version);
 
   if (args.packagePath && version) {

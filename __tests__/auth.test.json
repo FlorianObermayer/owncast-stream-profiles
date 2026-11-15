@@ -1,0 +1,535 @@
+[
+  {
+    "name": "an open profile grants a session instead of showing a form",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "GET",
+          "path": "/?return_to=%2Fhls%2Findex.m3u8",
+          "expect": {
+            "status": 302,
+            "headers": {
+              "Location": "/hls/index.m3u8"
+            }
+          }
+        }
+      }
+    ],
+    "expect": {
+      "userRegistrations": [
+        {
+          "authId": "a:open",
+          "displayName": "Guest"
+        }
+      ],
+      "sessionGrants": [
+        {
+          "userId": "u-a:open"
+        }
+      ]
+    }
+  },
+  {
+    "name": "with no active profile the gate stays closed and says why",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "GET",
+          "path": "/",
+          "expect": {
+            "status": 200,
+            "bodyContains": "No profile is active"
+          }
+        }
+      }
+    ],
+    "expect": {
+      "sessionGrants": []
+    }
+  },
+  {
+    "name": "a profile with credentials shows the login form",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "GET",
+          "path": "/",
+          "expect": {
+            "status": 200,
+            "bodyContains": "This stream is private"
+          }
+        }
+      }
+    ],
+    "expect": {
+      "sessionGrants": []
+    }
+  },
+  {
+    "name": "the form posts to the page that rendered it",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/",
+          "headers": { "Content-Type": "application/x-www-form-urlencoded" },
+          "body": "user=alice&password=secret",
+          "expect": { "status": 302 }
+        }
+      }
+    ],
+    "expect": {
+      "sessionGrants": [{ "userId": "u-a:c1" }]
+    }
+  },
+  {
+    "name": "the correct password grants a session and returns to the original path",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/auth/login",
+          "headers": {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          "body": "user=alice&password=secret&return_to=%2Fhls%2Findex.m3u8",
+          "expect": {
+            "status": 302,
+            "headers": {
+              "Location": "/hls/index.m3u8"
+            }
+          }
+        }
+      }
+    ],
+    "expect": {
+      "userRegistrations": [
+        {
+          "authId": "a:c1",
+          "displayName": "alice"
+        }
+      ],
+      "sessionGrants": [
+        {
+          "userId": "u-a:c1"
+        }
+      ]
+    }
+  },
+  {
+    "name": "a wrong password re-renders the form and grants nothing",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/auth/login",
+          "headers": {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          "body": "user=alice&password=wrong",
+          "expect": {
+            "status": 401,
+            "bodyContains": "That password is not correct"
+          }
+        }
+      }
+    ],
+    "expect": {
+      "sessionGrants": [],
+      "userRegistrations": []
+    }
+  },
+  {
+    "name": "a named credential rejects the wrong username even with the right password",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/auth/login",
+          "headers": {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          "body": "user=bob&password=secret",
+          "expect": {
+            "status": 401
+          }
+        }
+      }
+    ],
+    "expect": {
+      "sessionGrants": []
+    }
+  },
+  {
+    "name": "a password-only credential accepts any username",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c2\",\"user\":\"\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/auth/login",
+          "headers": {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          "body": "user=anyone&password=secret",
+          "expect": {
+            "status": 302
+          }
+        }
+      }
+    ],
+    "expect": {
+      "userRegistrations": [
+        {
+          "authId": "a:c2",
+          "displayName": "Guest"
+        }
+      ],
+      "sessionGrants": [
+        {
+          "userId": "u-a:c2"
+        }
+      ]
+    }
+  },
+  {
+    "name": "the Authorization header lets a non-browser client in",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "GET",
+          "path": "/",
+          "headers": {
+            "Authorization": "Basic YWxpY2U6c2VjcmV0"
+          },
+          "expect": {
+            "status": 302,
+            "headers": {
+              "Location": "/"
+            }
+          }
+        }
+      }
+    ],
+    "expect": {
+      "sessionGrants": [
+        {
+          "userId": "u-a:c1"
+        }
+      ]
+    }
+  },
+  {
+    "name": "a wrong Authorization header is refused without rendering the form",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "GET",
+          "path": "/",
+          "headers": {
+            "Authorization": "Basic YWxpY2U6d3Jvbmc="
+          },
+          "expect": {
+            "status": 401,
+            "bodyContains": "Invalid credentials"
+          }
+        }
+      }
+    ],
+    "expect": {
+      "sessionGrants": []
+    }
+  },
+  {
+    "name": "a crafted return_to cannot redirect off-site",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/auth/login",
+          "headers": {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          "body": "user=alice&password=secret&return_to=%2F%2Fevil.example%2Fsteal",
+          "expect": {
+            "status": 302,
+            "headers": {
+              "Location": "/"
+            }
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "onAuthCheck keeps a session issued by the active profile",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
+        "auth-session:u-a:c1": "a|c1"
+      }
+    },
+    "events": [
+      {
+        "authCheck": {
+          "user": {
+            "id": "u-a:c1",
+            "displayName": "alice"
+          },
+          "expect": {
+            "action": "ok"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "onAuthCheck revokes a session when a different profile becomes active",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"},{\"id\":\"b\",\"name\":\"B\"}]",
+        "active-profile": "b",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
+        "auth:b": "[{\"id\":\"c9\",\"user\":\"carol\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"75d0519fc852bbb89a70d6af155d68ad648f6374789d04a76aeada0a9599c283\"}]",
+        "auth-session:u-a:c1": "a|c1"
+      }
+    },
+    "events": [
+      {
+        "authCheck": {
+          "user": {
+            "id": "u-a:c1",
+            "displayName": "alice"
+          },
+          "expect": {
+            "action": "deny"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "onAuthCheck revokes a session whose credential was deleted",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
+        "auth-session:u-a:gone": "a|gone"
+      }
+    },
+    "events": [
+      {
+        "authCheck": {
+          "user": {
+            "id": "u-a:gone",
+            "displayName": "someone"
+          },
+          "expect": {
+            "action": "deny"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "onAuthCheck does not disturb a session while the profile is open",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a"
+      }
+    },
+    "events": [
+      {
+        "authCheck": {
+          "user": {
+            "id": "u-a:open",
+            "displayName": "Guest"
+          },
+          "expect": {
+            "action": "ok"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "the credential summary never carries a salt or a hash",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "GET",
+          "path": "/admin/api/auth?id=a",
+          "authenticated": true,
+          "expect": {
+            "status": 200,
+            "body": "{\"credentials\":[{\"id\":\"c1\",\"user\":\"alice\",\"passwordOnly\":false}]}"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "adding a credential stores only a hash of the password",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/auth",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\":\"a\",\"action\":\"add\",\"user\":\"alice\",\"password\":\"hunter2\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 200,
+            "bodyContains": "\"passwordOnly\":false"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "a duplicate username is refused",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/auth",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\":\"a\",\"action\":\"add\",\"user\":\"alice\",\"password\":\"another\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 400,
+            "bodyContains": "already exists"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "clearing a profile's credentials opens it",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/auth",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\":\"a\",\"action\":\"clear\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 200,
+            "bodyContains": "\"credentials\":[]"
+          }
+        }
+      }
+    ]
+  }
+]

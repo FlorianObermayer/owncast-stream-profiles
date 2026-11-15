@@ -22,6 +22,7 @@ in CI.
 | Path | What it is |
 | --- | --- |
 | `src/plugin.js` | Field schema, admin API calls, HTTP routes |
+| `src/auth.js` | Base64 and hand-written SHA-256, password hashing, credential records |
 | `public/admin/` | The admin page: three static files, no build step |
 | `plugin.manifest.json` | Identity, permissions, config shown to admins |
 | `INSTRUCTIONS.md` | Admin-facing guide, bundled into the package |
@@ -68,10 +69,21 @@ Two details specific to this plugin:
   before our code runs. Omit it to assert that gate.
 * The **admin password goes in the request body**, never `given.config`: pass
   `{"password": "..."}` on apply and server calls.
+* Gateway scenarios seed credentials under `auth:<profileId>` in `given.kv`. The
+  stored hash depends on `ROUNDS` in `src/auth.js`, so changing it means
+  regenerating those fixtures — the failure looks like "wrong password", not
+  like a hashing change.
 
 `npm run serve` (`PORT=8765` to change) adds dev-only endpoints for handlers HTTP
 cannot reach: `POST /_dev/chat`, `GET /_dev/chat`, `POST /_dev/event`. Restart it
 after code changes; use scenarios for repeatable assertions.
+
+One gap in the dev server: it does not wire `owncast.users.register` or
+`owncast.auth.grantSession`, so a successful viewer sign-in answers 503 there
+with `users.register is not available on this host`. The login page, form posts
+and `onAuthCheck` all work; only the grant needs a real host, which is why the
+gate is tested through scenarios (`authCheck`, `sessionGrants`,
+`userRegistrations`) rather than in the browser.
 
 `npm run package` runs `owncast-plugin-test --load-only` first — the same
 install-time path a server uses — so a package cannot be built from a plugin that
@@ -155,6 +167,31 @@ serving `GET /plugins` and `GET /plugins/<slug>` with
 * The admin page has no build step on purpose. Keep it three static files.
 * Comments explain *why*. Restating the code is noise.
 * No new runtime dependency without a reason: each is a supply-chain surface.
+
+## Viewer authentication
+
+A profile can carry viewer credentials, so the plugin holds `auth.gate` and
+`users.register`. Four constraints shape the code; each was established against
+Owncast's source rather than its docs:
+
+* **A plugin cannot prompt for HTTP Basic auth.** `services/plugins/server.go`
+  filters response headers through an allowlist and `WWW-Authenticate` is not in
+  it, so a 401 challenge never leaves the server. Browsers therefore get a form.
+  The `Authorization` request header *is* delivered, so non-browser clients that
+  send it themselves are accepted.
+* **Only one `auth.gate` plugin may be enabled.** This plugin replaces any other
+  authentication plugin rather than coexisting with it.
+* **The round count in `src/auth.js` is measured, not chosen for taste.** SHA-256
+  costs about 1.5 ms per round on the embedded interpreter, so `ROUNDS = 512` is
+  roughly 0.75 s per check against a 5 s handler budget. 4096 was measured to
+  time out. Salting stops a leaked digest being a direct lookup; the iteration
+  count is a speed bump, not a KDF, so password strength still matters.
+* **A session records the profile that issued it.** `onAuthCheck` denies a
+  session whose profile is no longer active, which is what makes "switching
+  profile switches who can watch" true rather than decorative.
+
+When changing credentials, keep the salt and hash server-side: the admin page is
+only ever sent `{ id, user, passwordOnly }`.
 
 ## Documentation direction
 

@@ -193,11 +193,24 @@ jobs:
       - name: Write the release notes
         # Plain shell, so no extra action is trusted with the release body.
         env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ needs.detect.outputs.version }}
           VERSION: ${{ needs.detect.outputs.version }}
         run: |
+          previous_tag="$(gh release list \
+            --repo "${GITHUB_REPOSITORY}" \
+            --limit 1 \
+            --json tagName \
+            --jq '.[0].tagName // empty')"
           {
             echo "Owncast plugin package for **stream-profiles ${VERSION}**."
             echo
+            if [ -n "${previous_tag}" ]; then
+              echo "### Changes"
+              echo
+              echo "[Full changelog: ${previous_tag}...${TAG}](https://github.com/${GITHUB_REPOSITORY}/compare/${previous_tag}...${TAG})"
+              echo
+            fi
             echo "### Install"
             echo
             echo "1. Download \`stream-profiles.ocpkg\` below."

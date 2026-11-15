@@ -47,6 +47,12 @@ the API, the page needs it to render widgets. Both sides change together.
 4. `activation` in both files if Owncast reads the value later than it is written.
 5. A scenario in `__tests__/profiles.test.json`.
 
+A field added to an existing release needs no migration: profiles stored before it
+existed have no value for it, and `loadProfiles` adds such keys to their `skip`
+list so applying an old profile cannot overwrite whatever the server is
+configured with now. Add it to `DEFAULT_SKIPPED` as well when even a *new* profile
+should leave it alone.
+
 Widget types: `text`, `textarea`, `list`, `boolean`, `enum`, `actions`, `socials`,
 `image`.
 

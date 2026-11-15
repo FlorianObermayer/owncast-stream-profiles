@@ -1033,5 +1033,29 @@
         }
       }
     ]
+  },
+  {
+    "name": "a credential cannot be stored against a profile the server does not have",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/auth",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\":\"not-saved-yet\",\"action\":\"add\",\"user\":\"alice\",\"password\":\"secret\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 404
+          }
+        }
+      }
+    ]
   }
 ]

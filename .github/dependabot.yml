@@ -1,0 +1,75 @@
+# Dependabot configuration.
+#
+# The goal is that a dependency bump reaching `main` has been published for a
+# while, is grouped with its siblings so it gets reviewed rather than rubber
+# stamped, and never widens the plugin's permissions. Each control below is
+# explained where it is set; see CONTRIBUTING.md for the release flow.
+#
+# `cooldown` is the important one: it refuses to open a PR for a release younger
+# than N days, which removes the window most npm supply-chain attacks rely on
+# (publish malicious version, wait for bots to bump to it). Security updates are
+# exempt from cooldown by design, so a real CVE is still patched immediately.
+
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 3
+
+    # Keep package.json ranges as written and only move the lockfile. The plugin
+    # ships a bundled artifact, so what matters is the exact resolved tree, not
+    # widening ranges.
+    versioning-strategy: lockfile-only
+
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+      semver-minor-days: 7
+      semver-patch-days: 3
+
+    # One PR for routine bumps, so a human actually reads the diff. Major
+    # versions are deliberately left ungrouped: they get their own PR and their
+    # own review.
+    groups:
+      npm-routine:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+    labels:
+      - dependencies
+      - npm
+    commit-message:
+      prefix: deps
+      include: scope
+
+  # Actions are pinned by commit SHA in the workflows; Dependabot rewrites both
+  # the SHA and the trailing version comment when it bumps them.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 2
+
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+
+    groups:
+      actions-routine:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: ci

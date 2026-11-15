@@ -1,0 +1,151 @@
+# Release a tagged build.
+#
+# Owncast distributes plugins as a self-contained `.ocpkg` file. There is no CLI
+# publish step: the public catalog (https://owncast.directory/plugins/submit)
+# takes an uploaded `.ocpkg`, and plugin ownership there is bound to an email
+# login. So this workflow does the part that can be automated —
+#
+#   test -> package -> verify invariants -> sign provenance -> GitHub release
+#
+# and leaves the catalog submission as one manual upload of the attached file.
+# See "Releasing" in README.md.
+#
+# Trigger by pushing a tag that matches the manifest version:
+#
+#   npm version --no-git-tag-version patch   # keeps package-lock in step
+#   # bump "version" in plugin.manifest.json to the same value
+#   git commit -am "release 0.0.2"
+#   git tag v0.0.2
+#   git push origin main --tags
+#
+# `scripts/check-release.mjs --tag` refuses the run when the tag and
+# plugin.manifest.json disagree, so a mistyped tag cannot publish the wrong
+# version.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+# Start from nothing and grant per job, so a compromised step cannot both write
+# a release and mint an attestation.
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  OWNCAST_PLUGIN_HOST_BINARIES_VERSION: v0.11.1
+  NPM_CONFIG_FUND: "false"
+  NPM_CONFIG_AUDIT: "false"
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: write # create the GitHub release
+      id-token: write # sign the build provenance attestation
+      attestations: write # store the attestation
+
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # Build from the tag's commit, not from whatever main points at.
+          ref: ${{ github.ref }}
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify the tag matches the manifest
+        run: node scripts/check-release.mjs --tag "${GITHUB_REF_NAME}"
+
+      - name: Run scenario tests
+        run: npm test
+
+      - name: Build the installable package
+        run: npm run package
+
+      - name: Verify the built package
+        run: node scripts/check-release.mjs --tag "${GITHUB_REF_NAME}" --package stream-profiles.ocpkg
+
+      - name: Checksum the package
+        run: sha256sum stream-profiles.ocpkg | tee SHA256SUMS.txt
+
+      - name: Attest build provenance
+        # Records which workflow, commit and inputs produced this exact file.
+        # Anyone can check it:
+        #
+        #   gh attestation verify stream-profiles.ocpkg \
+        #     --repo ${{ github.repository }}
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: stream-profiles.ocpkg
+
+      - name: Extract release notes
+        id: notes
+        # The changelog entry for this version, if there is one. Written with
+        # plain shell so no extra action is trusted for it.
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          {
+            echo "Owncast plugin package for **stream-profiles ${version}**."
+            echo
+            echo "### Install"
+            echo
+            echo "1. Download \`stream-profiles.ocpkg\` below."
+            echo "2. In your Owncast admin: **Plugins → Upload plugin**, pick the file."
+            echo "3. Review the permissions — \`http.serve\`, \`storage.kv\`, \`network.fetch\` — and enable it."
+            echo "4. Open the plugin's **Settings** tab and confirm \`owncastUrl\`."
+            echo
+            echo "### Verify this download"
+            echo
+            echo '```'
+            cat SHA256SUMS.txt
+            echo '```'
+            echo
+            echo "Provenance is attested by this repository's release workflow:"
+            echo
+            echo '```'
+            echo "gh attestation verify stream-profiles.ocpkg --repo ${GITHUB_REPOSITORY}"
+            echo '```'
+            echo
+            echo "Full setup notes: [README.md](https://github.com/${GITHUB_REPOSITORY}#readme)"
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: Create the GitHub release
+        # `gh` ships with the runner, so this needs no third-party release
+        # action and no PAT: the job's own token is enough.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "stream-profiles ${GITHUB_REF_NAME}" \
+            --notes-file release-notes.md \
+            --verify-tag \
+            stream-profiles.ocpkg \
+            SHA256SUMS.txt
+
+      - name: Attach build output to the run
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-${{ github.ref_name }}
+          path: |
+            stream-profiles.ocpkg
+            SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 90

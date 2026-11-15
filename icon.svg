@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Stream Profiles: a stack of profile cards with a play button">
+  <title>Stream Profiles</title>
+
+  <!--
+    Vector source for icon.png. The PNG is rendered by scripts/make-icon.py from
+    the same numbers; keep the two in sync.
+
+      * badge: rounded square, Owncast's own brand gradient (#2087e2 -> #b63fff)
+      * three profile sheets, back to front, each white
+      * a play mark on the front sheet
+
+    Every sheet after the first is preceded by a "gap ring" in the badge
+    gradient. The ring is the sheet's own shape grown by GAP (14 units), which
+    punches a clean notch out of the sheet behind, so the stack stays readable
+    when the icon is shown at 32px.
+  -->
+
+  <defs>
+    <linearGradient id="brand" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512">
+      <stop offset="0" stop-color="#2087E2"/>
+      <stop offset="1" stop-color="#B63FFF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- badge -->
+  <rect width="512" height="512" rx="112" fill="url(#brand)"/>
+
+  <!-- back sheet -->
+  <rect x="140" y="124" width="232" height="92" rx="26" fill="#fff"/>
+
+  <!-- gap ring + middle sheet (ring: w+28, h+28, rx+14) -->
+  <rect x="122" y="184" width="268" height="128" rx="44" fill="url(#brand)"/>
+  <rect x="136" y="198" width="240" height="100" rx="30" fill="#fff"/>
+
+  <!-- gap ring + front sheet -->
+  <rect x="118" y="258" width="276" height="144" rx="48" fill="url(#brand)"/>
+  <rect x="132" y="272" width="248" height="116" rx="34" fill="#fff"/>
+
+  <!-- play mark, optically centred on the front sheet -->
+  <path d="M232 292 L232 368 L304 330 Z" fill="url(#brand)"/>
+</svg>

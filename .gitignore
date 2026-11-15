@@ -1,0 +1,16 @@
+# Build output
+node_modules/
+.owncast-build/
+.owncast-plugin/
+dist/
+build/
+
+# The bundle produced by `npm run build`, before it is packaged
+/stream-profiles.js
+
+# Release artifacts are attached to GitHub releases, not committed
+*.ocpkg
+
+# Editor and OS noise
+.DS_Store
+*.log

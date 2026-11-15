@@ -1,0 +1,114 @@
+# Continuous integration.
+#
+# What this job is protecting:
+#
+#   1. The plugin still loads in the real Owncast host runtime (npm test).
+#   2. The thing we would ship declares exactly the permissions an admin was
+#      asked to approve (scripts/check-release.mjs).
+#   3. The workflow itself cannot be repointed at different code: every action
+#      is pinned to a commit SHA, and the default token is read-only.
+#
+# Actions are pinned by SHA rather than tag on purpose. A tag is mutable, so
+# `@v7` is whoever controls that repository today. The version is kept in a
+# trailing comment for humans and for Dependabot, which rewrites both.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Read-only by default. Nothing here needs to write to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The SDK's postinstall downloads the Owncast test/serve host binaries from
+  # that project's GitHub releases. Pin the tag so CI does not silently adopt a
+  # newly published binary: a bump then shows up as a reviewable diff.
+  OWNCAST_PLUGIN_HOST_BINARIES_VERSION: v0.11.1
+  # Fail the install if package.json and package-lock.json disagree.
+  NPM_CONFIG_FUND: "false"
+  NPM_CONFIG_AUDIT: "false"
+
+jobs:
+  test:
+    name: Test and package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Dependency audit
+        # Gate on high and critical only. The SDK pulls esbuild 0.24.x, which has
+        # a moderate advisory with no fix and no exposure here: esbuild's dev
+        # server is never started in this project. Anything high or critical
+        # fails the build.
+        run: npm audit --audit-level=high
+
+      - name: Check repository invariants
+        run: npm run check
+
+      - name: Run scenario tests
+        run: npm test
+
+      - name: Build the installable package
+        run: npm run package
+
+      - name: Verify the built package
+        run: npm run check:package
+
+      - name: Checksum the package
+        run: sha256sum stream-profiles.ocpkg | tee SHA256SUMS.txt
+
+      - name: Upload the package
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: stream-profiles-ocpkg
+          path: |
+            stream-profiles.ocpkg
+            SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+
+  dependency-review:
+    name: Review dependency changes
+    # Only meaningful on pull requests: it diffs the dependency graph against the
+    # base branch and fails if the PR introduces a known-vulnerable package.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure

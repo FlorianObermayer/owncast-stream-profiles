@@ -1,0 +1,320 @@
+/* Layout only. The host already injects Owncast's plugin baseline stylesheet
+   into this page, so inputs, buttons and headings are styled natively. */
+
+.sp-header {
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.sp-header h1 {
+  margin: 0 0 4px;
+  font-size: 1.4rem;
+}
+
+.sp-header p {
+  margin: 0 0 4px;
+}
+
+.sp-status {
+  flex: 0 0 auto;
+  max-width: 40%;
+  text-align: right;
+  font-size: 0.9em;
+  min-height: 1.4em;
+  white-space: pre-line;
+}
+
+.sp-status.error {
+  color: #dc2626;
+}
+
+.sp-status.ok {
+  color: #16a34a;
+}
+
+.sp-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.sp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sp-card {
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.sp-card[open] {
+  padding-bottom: 4px;
+}
+
+.sp-card > summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style-position: outside;
+}
+
+.sp-card > summary .sp-hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sp-badge {
+  font-size: 0.72em;
+  line-height: 1.6;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  opacity: 0.8;
+}
+
+.sp-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+
+.sp-row .sp-spacer {
+  flex: 1 1 auto;
+}
+
+.sp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.sp-field-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sp-field-head > label {
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.sp-field-head > input[type="checkbox"] {
+  margin: 0;
+}
+
+.sp-activation {
+  margin-left: auto;
+  font-size: 0.72em;
+  line-height: 1.6;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(217, 119, 6, 0.7);
+  color: #b45309;
+  white-space: nowrap;
+}
+
+.sp-field-excluded > label,
+.sp-field-excluded > .sp-hint {
+  opacity: 0.5;
+}
+
+.sp-field-excluded > input,
+.sp-field-excluded > textarea {
+  opacity: 0.6;
+}
+
+.sp-field textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+.sp-hint {
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+
+.sp-banner {
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  border-left: 3px solid #d97706;
+  background: rgba(217, 119, 6, 0.08);
+}
+
+.sp-banner.error {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.sp-banner.ok {
+  border-color: #16a34a;
+  background: rgba(22, 163, 74, 0.08);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* Owncast's plugin baseline styles `button.secondary` with
+   --theme-color-action-disabled as its text colour, which resolves to a pale
+   lavender (#b6b3c6) that is close to invisible on the admin's light
+   background. Restate the secondary button with the theme's action colour so it
+   keeps the outline look and stays readable. Scoped to this plugin's containers
+   and written with a descendant selector so it outranks the injected baseline,
+   which is added to the page after this file. */
+.sp-row button.secondary,
+.sp-toolbar button.secondary,
+.sp-rows button.secondary,
+.sp-image button.secondary {
+  background: transparent;
+  color: var(--theme-color-action, #6544e9);
+  border-color: var(--theme-color-action, #6544e9);
+}
+
+.sp-row button.secondary:hover,
+.sp-toolbar button.secondary:hover,
+.sp-rows button.secondary:hover,
+.sp-image button.secondary:hover {
+  background: var(--theme-color-action, #6544e9);
+  color: #fff;
+  border-color: var(--theme-color-action, #6544e9);
+}
+
+/* Owncast's baseline declares `label { display: flex; flex-direction: column }`,
+   which would stack this checkbox above its own text. Restate the direction. */
+.sp-inline {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 0.95em;
+  font-weight: 400;
+}
+
+.sp-inline > input[type="checkbox"] {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.sp-dialog {
+  max-width: 460px;
+  width: calc(100% - 32px);
+  padding: 20px 24px;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  border-radius: 10px;
+}
+
+.sp-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.sp-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 1.15rem;
+}
+
+.sp-dialog .sp-field {
+  margin: 16px 0 12px;
+}
+
+.sp-dialog .sp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.sp-group {
+  margin: 20px 0 8px;
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.sp-group:first-of-type {
+  margin-top: 8px;
+}
+
+.sp-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.sp-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sp-rows-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sp-rows-list:empty {
+  display: none;
+}
+
+.sp-row-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.sp-row-item > input {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.sp-rows > button {
+  align-self: flex-start;
+}
+
+.sp-image {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.sp-image-preview {
+  max-width: 320px;
+  max-height: 160px;
+  padding: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 8px;
+  background: rgba(128, 128, 128, 0.06);
+  object-fit: contain;
+}
+
+.sp-image .sp-row {
+  margin: 0;
+}
+
+.sp-image-caption {
+  margin: 0;
+}
+
+.sp-image-default .sp-image-preview {
+  opacity: 0.65;
+}
+
+.sp-image-default .sp-image-caption {
+  font-style: italic;
+}

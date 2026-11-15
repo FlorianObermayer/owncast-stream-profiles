@@ -1,0 +1,31 @@
+{
+  "name": "owncast-stream-profiles",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Owncast plugin: switch between named sets of stream copy, branding, discoverability, chat policy and advanced settings.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FlorianObermayer/owncast-stream-profiles.git"
+  },
+  "homepage": "https://github.com/FlorianObermayer/owncast-stream-profiles#readme",
+  "bugs": {
+    "url": "https://github.com/FlorianObermayer/owncast-stream-profiles/issues"
+  },
+  "scripts": {
+    "build": "owncast-plugin build",
+    "test": "owncast-plugin build && owncast-plugin test",
+    "serve": "owncast-plugin build && owncast-plugin serve",
+    "package": "owncast-plugin build && owncast-plugin package",
+    "check": "node scripts/check-release.mjs",
+    "check:package": "node scripts/check-release.mjs --package stream-profiles.ocpkg",
+    "release:verify": "npm run check && npm test && npm run package && npm run check:package"
+  },
+  "dependencies": {
+    "@owncast/plugin-sdk": "^0.11.0"
+  },
+  "allowScripts": {
+    "@owncast/plugin-sdk@0.11.0": true,
+    "esbuild@0.24.2": true
+  }
+}

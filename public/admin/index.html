@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stream profiles</title>
+    <link rel="stylesheet" href="./admin.css" />
+  </head>
+  <body>
+    <header class="sp-header">
+      <div>
+        <h1>Stream profiles</h1>
+        <p class="muted">
+          Save the text that surrounds a broadcast as a named profile, then
+          switch every field at once.
+        </p>
+        <p class="sp-hint" id="target"></p>
+      </div>
+      <div class="sp-status" id="status" aria-live="polite"></div>
+    </header>
+
+    <div class="sp-banner" id="connection" hidden></div>
+
+    <section class="sp-toolbar">
+      <button id="save" type="button">Save changes</button>
+      <button id="add" type="button" class="secondary">Add profile</button>
+      <button id="capture" type="button" class="secondary">
+        Capture current settings
+      </button>
+      <button id="test" type="button" class="secondary">Test connection</button>
+      <button id="reload" type="button" class="secondary">Reload</button>
+      <button id="forget" type="button" class="secondary" hidden>
+        Forget password
+      </button>
+    </section>
+
+    <div id="profiles" class="sp-list"></div>
+    <p id="empty" class="muted" hidden>
+      No profiles yet. Add one, or capture what the server is using right now.
+    </p>
+
+    <dialog id="password-dialog" class="sp-dialog">
+      <form id="password-form">
+        <h2 id="password-title">Admin password</h2>
+        <p class="muted" id="password-reason">
+          Owncast's admin API needs your admin password to change these
+          settings.
+        </p>
+
+        <p class="sp-banner error" id="password-error" hidden></p>
+
+        <div class="sp-field">
+          <label for="password-input">Owncast admin password</label>
+          <input
+            id="password-input"
+            type="password"
+            autocomplete="current-password"
+            spellcheck="false"
+          />
+        </div>
+
+        <label class="sp-inline">
+          <input id="password-remember" type="checkbox" checked />
+          Keep it in this browser tab until I close it
+        </label>
+
+        <p class="sp-hint">
+          The password is never saved in Owncast's database. If you keep it, it
+          lives only in this tab's session storage.
+        </p>
+
+        <div class="sp-row">
+          <button id="password-cancel" type="button" class="secondary">
+            Cancel
+          </button>
+          <span class="sp-spacer"></span>
+          <button id="password-submit" type="submit">Apply</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="./admin.js"></script>
+  </body>
+</html>

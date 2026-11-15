@@ -1,0 +1,1119 @@
+[
+  {
+    "name": "the admin API is gated by the host",
+    "events": [
+      {
+        "http": {
+          "method": "GET",
+          "path": "/admin/api/state",
+          "expect": {
+            "status": 401
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "state never carries a password or image bytes",
+    "events": [
+      {
+        "http": {
+          "method": "GET",
+          "path": "/admin/api/state",
+          "authenticated": true,
+          "expect": {
+            "status": 200,
+            "bodyContains": "\"owncastUrl\""
+          }
+        }
+      }
+    ],
+    "expect": {
+      "kv": {}
+    }
+  },
+  {
+    "name": "saving fills in typed defaults for a bare profile",
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/profiles",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"profiles\":[{\"id\":\"a\",\"name\":\"A\"}]}",
+          "authenticated": true,
+          "expect": {
+            "status": 200
+          }
+        }
+      }
+    ],
+    "expect": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
+      }
+    }
+  },
+  {
+    "name": "saving parses tags, booleans and autoplay",
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/profiles",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"profiles\":[{\"id\":\"a\",\"name\":\"A\",\"tags\":\" familie , event ,familie,,\",\"nsfw\":true,\"directoryEnabled\":\"true\",\"autoplay\":\"off\"}]}",
+          "authenticated": true,
+          "expect": {
+            "status": 200
+          }
+        }
+      }
+    ],
+    "expect": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[\"familie\",\"event\"],\"nsfw\":true,\"directoryEnabled\":true,\"autoplay\":\"off\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
+      }
+    }
+  },
+  {
+    "name": "an unknown autoplay mode falls back to the default",
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/profiles",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"profiles\":[{\"id\":\"a\",\"name\":\"A\",\"autoplay\":\"loud\"}]}",
+          "authenticated": true,
+          "expect": {
+            "status": 200
+          }
+        }
+      }
+    ],
+    "expect": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
+      }
+    }
+  },
+  {
+    "name": "incomplete action buttons and social links are dropped",
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/profiles",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"profiles\":[{\"id\":\"a\",\"name\":\"A\",\"externalActions\":[{\"title\":\"Photos\",\"url\":\" https://example.com/p \"},{\"title\":\"\",\"url\":\"https://example.com/nope\"},{\"title\":\"Nothing\"},{\"title\":\"Embed\",\"html\":\"<p>hi</p>\"}],\"socialHandles\":[{\"platform\":\"github\",\"url\":\"https://github.com/x\"},{\"platform\":\"\",\"url\":\"https://example.com\"},{\"platform\":\"matrix\"}]}]}",
+          "authenticated": true,
+          "expect": {
+            "status": 200
+          }
+        }
+      }
+    ],
+    "expect": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[{\"title\":\"Photos\",\"url\":\"https://example.com/p\",\"description\":\"\",\"html\":\"\",\"icon\":\"\",\"color\":\"\",\"openExternally\":false},{\"title\":\"Embed\",\"url\":\"\",\"description\":\"\",\"html\":\"<p>hi</p>\",\"icon\":\"\",\"color\":\"\",\"openExternally\":false}],\"socialHandles\":[{\"platform\":\"github\",\"url\":\"https://github.com/x\",\"icon\":\"\"}],\"logo\":false,\"favicon\":false}]"
+      }
+    }
+  },
+  {
+    "name": "saving keeps only known skip keys",
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/profiles",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"profiles\":[{\"id\":\"a\",\"name\":\"A\",\"skip\":[\"tags\",\"bogus\",\"tags\",7,\"nsfw\"]}]}",
+          "authenticated": true,
+          "expect": {
+            "status": 200
+          }
+        }
+      }
+    ],
+    "expect": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\",\"skip\":[\"tags\",\"nsfw\"],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
+      }
+    }
+  },
+  {
+    "name": "an image is stored beside the profile, not inside it",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/image",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\":\"k\",\"field\":\"logo\",\"data\":\"data:image/png;base64,iVBORw0KGgo=\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 200
+          }
+        }
+      }
+    ],
+    "expect": {
+      "kv": {
+        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]",
+        "image:k:logo": "data:image/png;base64,iVBORw0KGgo="
+      }
+    }
+  },
+  {
+    "name": "image data is not echoed into the profile by a later save",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]",
+        "image:k:logo": "data:image/png;base64,iVBORw0KGgo="
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/profiles",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"profiles\":[{\"id\":\"k\",\"name\":\"K\",\"logo\":true,\"favicon\":false}]}",
+          "authenticated": true,
+          "expect": {
+            "status": 200
+          }
+        }
+      }
+    ],
+    "expect": {
+      "kv": {
+        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]",
+        "image:k:logo": "data:image/png;base64,iVBORw0KGgo="
+      }
+    }
+  },
+  {
+    "name": "an invalid data URI is rejected",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/image",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\":\"k\",\"field\":\"logo\",\"data\":\"https://x/y.png\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 400
+          }
+        }
+      }
+    ],
+    "expect": {
+      "kv": {
+        "image:k:logo": ""
+      }
+    }
+  },
+  {
+    "name": "an unknown image field is rejected",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/image",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\":\"k\",\"field\":\"avatar\",\"data\":\"data:image/png;base64,iVBORw0KGgo=\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 400
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "an unknown profile cannot receive an image",
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/image",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\":\"nope\",\"field\":\"logo\",\"data\":\"data:image/png;base64,iVBORw0KGgo=\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 404
+          }
+        }
+      }
+    ],
+    "expect": {
+      "kv": {
+        "image:nope:logo": ""
+      }
+    }
+  },
+  {
+    "name": "reading an image returns the data URI",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]",
+        "image:k:favicon": "data:image/x-icon;base64,AAABAAEAEBA="
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "GET",
+          "path": "/admin/api/image?id=k&field=favicon",
+          "authenticated": true,
+          "expect": {
+            "status": 200,
+            "bodyContains": "data:image/x-icon;base64"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "reading an unknown image field is a 400",
+    "events": [
+      {
+        "http": {
+          "method": "GET",
+          "path": "/admin/api/image?id=k&field=avatar",
+          "authenticated": true,
+          "expect": {
+            "status": 400
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "deleting a profile clears its images",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false},{\"id\":\"gone\",\"name\":\"Gone\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]",
+        "image:gone:logo": "data:image/png;base64,iVBORw0KGgo="
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/profiles",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"profiles\":[{\"id\":\"k\",\"name\":\"K\"}]}",
+          "authenticated": true,
+          "expect": {
+            "status": 200
+          }
+        }
+      }
+    ],
+    "expect": {
+      "kv": {
+        "image:gone:logo": ""
+      }
+    }
+  },
+  {
+    "name": "state reports image presence as a flag",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]",
+        "image:k:logo": "data:image/png;base64,iVBORw0KGgo="
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "GET",
+          "path": "/admin/api/state",
+          "authenticated": true,
+          "expect": {
+            "status": 200,
+            "bodyContains": "\"logo\":true"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "applying sends the stored logo and favicon",
+    "given": {
+      "config": {
+        "owncastUrl": "http://127.0.0.1:8080"
+      },
+      "kv": {
+        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[\"serverName\",\"videoServingEndpoint\",\"customStyles\",\"customJavascript\",\"chatDisabled\",\"hideViewerCount\",\"disableSearchIndexing\",\"externalActions\",\"socialHandles\"],\"serverName\":\"\",\"streamTitle\":\"T\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[\"a\"],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]",
+        "image:k:logo": "data:image/png;base64,iVBORw0KGgo=",
+        "image:k:favicon": "data:image/x-icon;base64,AAABAAEAEBA="
+      },
+      "httpResponses": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/*",
+          "status": 200,
+          "body": "{\"success\":true,\"message\":\"changed\"}"
+        }
+      ]
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/apply",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\":\"k\",\"password\":\"s3cret pass\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 200
+          }
+        }
+      }
+    ],
+    "expect": {
+      "httpRequests": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/streamtitle",
+          "method": "POST",
+          "body": "{\"value\":\"T\"}"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/serversummary",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/welcomemessage",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/offlinemessage",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/pagecontent",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/tags",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/nsfw",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/directoryenabled",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/autoplay",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/chat/joinmessagesenabled",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/federation/livemessage",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/logo",
+          "method": "POST",
+          "body": "{\"value\":\"data:image/png;base64,iVBORw0KGgo=\"}"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/favicon",
+          "method": "POST",
+          "body": "{\"value\":\"data:image/x-icon;base64,AAABAAEAEBA=\"}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "a profile without images applies the stock logo and resets the favicon",
+    "given": {
+      "config": {
+        "owncastUrl": "http://127.0.0.1:8080"
+      },
+      "kv": {
+        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[\"serverName\",\"videoServingEndpoint\",\"customStyles\",\"customJavascript\",\"chatDisabled\",\"hideViewerCount\",\"disableSearchIndexing\",\"externalActions\",\"socialHandles\"],\"serverName\":\"\",\"streamTitle\":\"T\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[\"a\"],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
+      },
+      "httpResponses": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/*",
+          "status": 200,
+          "body": "{\"success\":true,\"message\":\"changed\"}"
+        }
+      ]
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/apply",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\":\"k\",\"password\":\"s3cret pass\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 200
+          }
+        }
+      }
+    ],
+    "expect": {
+      "httpRequests": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/streamtitle",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/serversummary",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/welcomemessage",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/offlinemessage",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/pagecontent",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/tags",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/nsfw",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/directoryenabled",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/autoplay",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/chat/joinmessagesenabled",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/federation/livemessage",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/logo",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/favicon",
+          "method": "DELETE"
+        }
+      ]
+    }
+  },
+  {
+    "name": "skipping an image field leaves the endpoint alone",
+    "given": {
+      "config": {
+        "owncastUrl": "http://127.0.0.1:8080"
+      },
+      "kv": {
+        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[\"serverName\",\"videoServingEndpoint\",\"customStyles\",\"customJavascript\",\"chatDisabled\",\"hideViewerCount\",\"disableSearchIndexing\",\"externalActions\",\"socialHandles\",\"logo\"],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]",
+        "image:k:logo": "data:image/png;base64,iVBORw0KGgo="
+      },
+      "httpResponses": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/*",
+          "status": 200,
+          "body": "{\"success\":true,\"message\":\"changed\"}"
+        }
+      ]
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/apply",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\":\"k\",\"password\":\"s3cret pass\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 200
+          }
+        }
+      }
+    ],
+    "expect": {
+      "httpRequests": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/streamtitle",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/serversummary",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/welcomemessage",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/offlinemessage",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/pagecontent",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/tags",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/nsfw",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/directoryenabled",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/autoplay",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/chat/joinmessagesenabled",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/federation/livemessage",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/favicon",
+          "method": "DELETE"
+        }
+      ]
+    }
+  },
+  {
+    "name": "applying without a password makes no outbound call",
+    "given": {
+      "config": {
+        "owncastUrl": "http://127.0.0.1:8080"
+      },
+      "kv": {
+        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"T\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[\"a\"],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/apply",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\":\"k\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 400
+          }
+        }
+      }
+    ],
+    "expect": {
+      "httpRequests": [],
+      "kv": {
+        "active-profile": ""
+      }
+    }
+  },
+  {
+    "name": "a rejected password keeps the profile inactive",
+    "given": {
+      "config": {
+        "owncastUrl": "http://127.0.0.1:8080"
+      },
+      "kv": {
+        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"T\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[\"a\"],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
+      },
+      "httpResponses": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/*",
+          "status": 401,
+          "body": "Unauthorized"
+        }
+      ]
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/apply",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\":\"k\",\"password\":\"wrong\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 401
+          }
+        }
+      }
+    ],
+    "expect": {
+      "kv": {
+        "active-profile": ""
+      }
+    }
+  },
+  {
+    "name": "applying an unknown profile is a 404",
+    "given": {
+      "config": {
+        "owncastUrl": "http://127.0.0.1:8080"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/apply",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\":\"nope\",\"password\":\"s3cret pass\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 404
+          }
+        }
+      }
+    ],
+    "expect": {
+      "httpRequests": []
+    }
+  },
+  {
+    "name": "capture requires a password",
+    "given": {
+      "config": {
+        "owncastUrl": "http://127.0.0.1:8080"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/server",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{}",
+          "authenticated": true,
+          "expect": {
+            "status": 400
+          }
+        }
+      }
+    ],
+    "expect": {
+      "httpRequests": []
+    }
+  },
+  {
+    "name": "capture maps the server config and leaves images to the page",
+    "given": {
+      "config": {
+        "owncastUrl": "http://127.0.0.1:8080"
+      },
+      "httpResponses": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/serverconfig",
+          "status": 200,
+          "body": "{\"instanceDetails\":{\"streamTitle\":\"Live\",\"tags\":[\"familie\"]},\"yp\":{\"enabled\":true},\"federation\":{\"goLiveMessage\":\"we are live\"}}"
+        }
+      ]
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/server",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"password\":\"s3cret pass\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 200,
+            "bodyContains": "\"logo\":false,\"favicon\":false"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "a rejected password surfaces as unauthorized",
+    "given": {
+      "config": {
+        "owncastUrl": "http://127.0.0.1:8080"
+      },
+      "httpResponses": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/serverconfig",
+          "status": 401,
+          "body": "Unauthorized"
+        }
+      ]
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/server",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"password\":\"wrong\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 401,
+            "bodyContains": "\"unauthorized\""
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "the stock logo is bundled with the plugin",
+    "events": [
+      {
+        "http": {
+          "method": "GET",
+          "path": "/admin/api/defaults",
+          "authenticated": true,
+          "expect": {
+            "status": 200,
+            "bodyContains": "data:image/png;base64,"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "an empty favicon is a bodiless DELETE, an empty logo uploads Owncast's stock file",
+    "given": {
+      "config": {
+        "owncastUrl": "http://127.0.0.1:8080"
+      },
+      "kv": {
+        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[\"serverName\",\"videoServingEndpoint\",\"customStyles\",\"customJavascript\",\"chatDisabled\",\"hideViewerCount\",\"disableSearchIndexing\",\"externalActions\",\"socialHandles\"],\"serverName\":\"\",\"streamTitle\":\"T\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
+      },
+      "httpResponses": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/*",
+          "status": 200,
+          "body": "{\"success\":true,\"message\":\"changed\"}"
+        }
+      ]
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/apply",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\": \"k\", \"password\": \"s3cret pass\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 200
+          }
+        }
+      }
+    ],
+    "expect": {
+      "httpRequests": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/streamtitle",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/serversummary",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/welcomemessage",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/offlinemessage",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/pagecontent",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/tags",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/nsfw",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/directoryenabled",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/autoplay",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/chat/joinmessagesenabled",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/federation/livemessage",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/logo",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/favicon",
+          "method": "DELETE"
+        }
+      ]
+    }
+  },
+  {
+    "name": "apply reports the fields that take effect later",
+    "given": {
+      "config": {
+        "owncastUrl": "http://127.0.0.1:8080"
+      },
+      "kv": {
+        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[\"serverName\",\"videoServingEndpoint\",\"customStyles\",\"customJavascript\",\"chatDisabled\",\"hideViewerCount\",\"disableSearchIndexing\",\"externalActions\",\"socialHandles\"],\"serverName\":\"\",\"streamTitle\":\"T\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
+      },
+      "httpResponses": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/*",
+          "status": 200,
+          "body": "{\"success\":true,\"message\":\"changed\"}"
+        }
+      ]
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/apply",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\": \"k\", \"password\": \"s3cret pass\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 200,
+            "bodyContains": "\"pending\""
+          }
+        }
+      }
+    ],
+    "expect": {
+      "httpRequests": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/streamtitle",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/serversummary",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/welcomemessage",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/offlinemessage",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/pagecontent",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/tags",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/nsfw",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/directoryenabled",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/autoplay",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/chat/joinmessagesenabled",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/federation/livemessage",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/logo",
+          "method": "POST"
+        },
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/favicon",
+          "method": "DELETE"
+        }
+      ]
+    }
+  },
+  {
+    "name": "an apply with only instant fields reports an empty pending list",
+    "given": {
+      "config": {
+        "owncastUrl": "http://127.0.0.1:8080"
+      },
+      "kv": {
+        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[\"serverName\",\"videoServingEndpoint\",\"customStyles\",\"customJavascript\",\"chatDisabled\",\"hideViewerCount\",\"disableSearchIndexing\",\"externalActions\",\"socialHandles\",\"directoryEnabled\",\"federationGoLiveMessage\",\"logo\",\"favicon\"],\"serverName\":\"\",\"streamTitle\":\"T\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
+      },
+      "httpResponses": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/*",
+          "status": 200,
+          "body": "{\"success\":true,\"message\":\"changed\"}"
+        }
+      ]
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/apply",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\": \"k\", \"password\": \"s3cret pass\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 200,
+            "bodyContains": "\"pending\":[]"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "a non-JSON upstream error body is passed through verbatim",
+    "given": {
+      "config": {
+        "owncastUrl": "http://127.0.0.1:8080"
+      },
+      "kv": {
+        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[\"serverName\",\"videoServingEndpoint\",\"customStyles\",\"customJavascript\",\"chatDisabled\",\"hideViewerCount\",\"disableSearchIndexing\",\"externalActions\",\"socialHandles\"],\"serverName\":\"\",\"streamTitle\":\"T\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
+      },
+      "httpResponses": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/*",
+          "status": 413,
+          "body": "<html><body><h1>413 Request Entity Too Large</h1><hr>nginx</body></html>"
+        }
+      ]
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/apply",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\": \"k\", \"password\": \"s3cret pass\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 502,
+            "bodyContains": "Request Entity Too Large"
+          }
+        }
+      }
+    ],
+    "expect": {
+      "httpRequests": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/streamtitle",
+          "method": "POST"
+        }
+      ]
+    }
+  }
+]

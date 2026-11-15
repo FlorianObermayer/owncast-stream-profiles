@@ -19,6 +19,7 @@
     "package": "owncast-plugin build && owncast-plugin package",
     "check": "node scripts/check-release.mjs",
     "check:package": "node scripts/check-release.mjs --package stream-profiles.ocpkg",
+    "version:bump": "node scripts/set-version.mjs",
     "release:verify": "npm run check && npm test && npm run package && npm run check:package"
   },
   "dependencies": {

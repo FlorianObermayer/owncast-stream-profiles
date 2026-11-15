@@ -35,6 +35,8 @@ const REQUIRED_FILES = [
   "LICENSE",
   "CONTRIBUTING.md",
   "SECURITY.md",
+  "scripts/check-release.mjs",
+  "scripts/set-version.mjs",
   ".github/images/admin-overview.png",
   ".github/images/admin-fields.png",
   ".github/images/admin-password.png",

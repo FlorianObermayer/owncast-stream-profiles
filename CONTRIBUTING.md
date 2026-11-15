@@ -29,6 +29,7 @@ in CI.
 | `icon.png` / `icon.svg` | Plugin badge |
 | `__tests__/` | Scenario tests |
 | `scripts/check-release.mjs` | Release and security guard |
+| `scripts/set-version.mjs` | Bumps the version in all three files at once |
 | `.github/images/` | Screenshots for the README |
 
 ## Adding a field
@@ -77,12 +78,13 @@ would fail to load.
 
 ## Releasing
 
-The version lives in `package.json` and `plugin.manifest.json` and must match the
-tag.
+The version is recorded in three places, and all three must agree before a tag:
+`package.json`, `package-lock.json` and `plugin.manifest.json`. Use the script;
+`npm version` alone only updates the first two, and the manifest is the one the
+host and the catalog read.
 
 ```bash
-npm version --no-git-tag-version patch   # package.json + lockfile
-# edit plugin.manifest.json to the same version
+npm run version:bump patch   # or minor / major / 0.1.0
 npm run release:verify
 git commit -am "release 0.0.2" && git tag v0.0.2 && git push origin main --tags
 ```

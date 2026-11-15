@@ -443,11 +443,18 @@ function adminRequest(method, path, payload, password) {
   try {
     response = owncast.http.fetch(url, options);
   } catch (error) {
+    // The URL is for the server log; the operator needs to know what to do,
+    // not which address was tried.
+    owncast.log.error(
+      "stream-profiles: could not reach " + url + ": " + describeError(error),
+    );
     return {
       ok: false,
       status: 0,
       code: "network",
-      error: "Could not reach " + url + ": " + describeError(error),
+      error:
+        "Could not reach Owncast. If it runs somewhere other than this " +
+        "machine, set its address in this plugin's settings.",
     };
   }
 
@@ -1257,7 +1264,7 @@ function adminAccessAction(body) {
 
   if (action === "clear") {
     clearAdminEntry();
-    owncast.log.info("stream-profiles: admin access credential removed");
+    owncast.log.info("stream-profiles: owner login removed");
     return jsonResponse(200, { ok: true, adminAccess: null });
   }
 
@@ -1269,7 +1276,7 @@ function adminAccessAction(body) {
   const password = text(body.password);
 
   if (user === "") {
-    return jsonResponse(400, { error: "Enter a username for the admin login." });
+    return jsonResponse(400, { error: "Enter a username for the owner login." });
   }
   if (user.indexOf(":") !== -1) {
     return jsonResponse(400, { error: "A username cannot contain a colon." });
@@ -1286,7 +1293,7 @@ function adminAccessAction(body) {
     hash: hashPassword(password, salt),
   });
 
-  owncast.log.info('stream-profiles: admin access credential set for "' + user + '"');
+  owncast.log.info('stream-profiles: owner login set for "' + user + '"');
   return jsonResponse(200, { ok: true, adminAccess: { user: user } });
 }
 
@@ -1618,7 +1625,7 @@ module.exports = definePlugin({
     // switch and a missing profile, which is the whole point of it existing.
     if (parts[0] === ADMIN_SCOPE) {
       if (!auth.admin || auth.admin.id !== parts[1]) {
-        return authCheck.deny("the admin credential was removed or replaced");
+        return authCheck.deny("the owner login was removed or replaced");
       }
       return authCheck.refresh({ ttl: SESSION_RENEW_SECONDS });
     }

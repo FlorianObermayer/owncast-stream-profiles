@@ -13,22 +13,17 @@ Branding.
 
 Each profile can also carry its own **viewer access** list — usernames with
 passwords, or shared passwords with no username — so switching profile switches
-who is allowed to watch. Passwords are stored as a salted hash and only ever
-leave the server as a username in the admin page.
+who is allowed to watch. Passwords are never stored or shown in readable form.
 
-One login is deliberately **not** tied to a profile: an admin username and
-password that works whatever profile is active, and even when none is. It exists
-so a mistake in a profile's access list cannot lock the owner out.
+One login is deliberately **not** tied to a profile: an owner login (no extra
+privileges, just a way in) that works whatever profile is active, and even when
+none is. It exists so a mistake in a profile's access list cannot lock the owner
+out.
 
-Using this makes the plugin the site's login gate, which Owncast allows only one
-plugin to be at a time. Browsers see a sign-in page rather than the native HTTP
-Basic dialog, because Owncast filters the response header a plugin would need to
-prompt one.
-
-The gate covers whatever Owncast's **Authentication** tab says it covers. In the
-default *Website only* mode the page is protected but `/hls/*` stays public, so
-choose a stricter mode if the video itself must be private. See
-[INSTRUCTIONS.md](INSTRUCTIONS.md).
+Viewers sign in on a page rather than through a browser dialog, so a player app
+cannot use it. What the sign-in protects — the page only, or the video too — is
+Owncast's own **Authentication** setting, and the default leaves the video
+public. See [INSTRUCTIONS.md](INSTRUCTIONS.md).
 
 ## Install
 
@@ -48,15 +43,14 @@ compare the file against `SHA256SUMS.txt` instead, which needs only `sha256sum`.
 
 ## Set up
 
-One setting: `owncastUrl` in **Plugins → Stream Profiles → Settings**. Then press
-**Capture current settings** on the Profiles tab to import what the server
-already uses.
+No settings to fill in. Open the **Profiles** tab and press **Capture current
+settings** to import what the server already uses into your first profile.
 
 The viewer access list is optional and empty by default, and an empty list on an
-**active** profile leaves the site open. With no profile active at all the gate
-stays closed, so apply a profile before enabling the plugin — `/admin` stays
-reachable either way. See [INSTRUCTIONS.md](INSTRUCTIONS.md) for the full
-behaviour.
+**active** profile leaves the site open. With no profile active at all the site
+stays closed to viewers, so apply a profile before enabling the plugin — the
+admin pages stay reachable either way. See [INSTRUCTIONS.md](INSTRUCTIONS.md) for
+the full behaviour.
 
 ## Development
 

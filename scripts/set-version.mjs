@@ -111,7 +111,10 @@ function main() {
 
   console.log(`version ${pkg.version} -> ${next}`);
   console.log("updated: package.json, package-lock.json, plugin.manifest.json");
-  console.log(`\nnext: git commit -am "release ${next}" && git tag v${next}`);
+  // main is protected, so the bump lands by pull request and the tag is pushed
+  // afterwards, on the merge commit. Tagging first would pin an unmerged commit.
+  console.log(`\nnext: commit and open a pull request`);
+  console.log(`then, on main after the merge: git tag v${next} && git push origin v${next}`);
 }
 
 try {

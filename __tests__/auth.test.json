@@ -97,14 +97,22 @@
         "http": {
           "method": "POST",
           "path": "/",
-          "headers": { "Content-Type": "application/x-www-form-urlencoded" },
+          "headers": {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
           "body": "user=alice&password=secret",
-          "expect": { "status": 302 }
+          "expect": {
+            "status": 302
+          }
         }
       }
     ],
     "expect": {
-      "sessionGrants": [{ "userId": "u-a:c1" }]
+      "sessionGrants": [
+        {
+          "userId": "u-a:c1"
+        }
+      ]
     }
   },
   {
@@ -335,7 +343,7 @@
     ]
   },
   {
-    "name": "onAuthCheck keeps a session issued by the active profile",
+    "name": "onAuthCheck renews a session issued by the active profile",
     "given": {
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
@@ -352,7 +360,7 @@
             "displayName": "alice"
           },
           "expect": {
-            "action": "ok"
+            "action": "refresh"
           }
         }
       }

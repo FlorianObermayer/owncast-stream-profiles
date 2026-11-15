@@ -45,6 +45,14 @@ const CREDENTIALS_PREFIX = "auth:";
 // sessions of the old one instead of letting them ride along.
 const SESSION_PREFIX = "auth-session:";
 
+// Lifetime of a renewed session, in seconds. Owncast's default is 24 h and is
+// absolute: a viewer who never signs in again is dropped 24 h later even if
+// they watch every day. Returning `refresh` on each page load makes it sliding,
+// which is what a viewer expects from "signed in". The same 24 h keeps the
+// revocation backstop unchanged, since a revoked viewer is only noticed on a
+// page load anyway.
+const SESSION_RENEW_SECONDS = 24 * 60 * 60;
+
 const AUTOPLAY_MODES = ["off", "always", "sound-only"];
 
 // The single source of truth for what a profile can hold. `type` drives both
@@ -1495,6 +1503,9 @@ module.exports = definePlugin({
     });
     if (!stillExists) return authCheck.deny("that credential was removed");
 
-    return authCheck.ok();
+    // Still entitled: renew rather than merely accept. Without this the host's
+    // fixed expiry logs out a viewer who has done nothing wrong but not reloaded
+    // for a day.
+    return authCheck.refresh({ ttl: SESSION_RENEW_SECONDS });
   },
 });

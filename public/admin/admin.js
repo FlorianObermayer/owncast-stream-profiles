@@ -1278,7 +1278,9 @@
       "Who may watch while this profile is active. No entries means the site " +
       "is open. With entries, viewers sign in with any of these. A credential " +
       "without a username accepts any username with the right password. " +
-      "Passwords are stored as a salted hash, never in readable form.";
+      "Passwords are stored as a salted hash, never in readable form. What is " +
+      "actually protected depends on the Authentication tab: the default mode " +
+      "gates the page but leaves the video stream public.";
     section.appendChild(hint);
 
     const list = document.createElement("div");

@@ -539,5 +539,118 @@
         }
       }
     ]
+  },
+  {
+    "name": "a named credential wins over an earlier password-only entry with the same password",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"},{\"id\":\"c2\",\"user\":\"huhu\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "GET",
+          "path": "/",
+          "headers": {
+            "Authorization": "Basic aHVodTpzZWNyZXQ="
+          },
+          "expect": {
+            "status": 302
+          }
+        }
+      }
+    ],
+    "expect": {
+      "userRegistrations": [
+        {
+          "authId": "a:c2",
+          "displayName": "huhu"
+        }
+      ],
+      "sessionGrants": [
+        {
+          "userId": "u-a:c2"
+        }
+      ]
+    }
+  },
+  {
+    "name": "the login form resolves the same way for a named credential",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"},{\"id\":\"c2\",\"user\":\"huhu\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/auth/login",
+          "headers": {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          "body": "user=huhu&password=secret",
+          "expect": {
+            "status": 302
+          }
+        }
+      }
+    ],
+    "expect": {
+      "userRegistrations": [
+        {
+          "authId": "a:c2",
+          "displayName": "huhu"
+        }
+      ],
+      "sessionGrants": [
+        {
+          "userId": "u-a:c2"
+        }
+      ]
+    }
+  },
+  {
+    "name": "an unknown username still falls back to the shared password entry",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"},{\"id\":\"c2\",\"user\":\"huhu\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/auth/login",
+          "headers": {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          "body": "user=someone&password=secret",
+          "expect": {
+            "status": 302
+          }
+        }
+      }
+    ],
+    "expect": {
+      "userRegistrations": [
+        {
+          "authId": "a:c1",
+          "displayName": "Guest"
+        }
+      ],
+      "sessionGrants": [
+        {
+          "userId": "u-a:c1"
+        }
+      ]
+    }
   }
 ]

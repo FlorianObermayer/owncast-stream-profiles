@@ -2,7 +2,7 @@
   "api": "1",
   "name": "Stream Profiles",
   "slug": "stream-profiles",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Save named sets of stream copy, branding, discoverability, chat policy and advanced page settings, then switch between them from the admin.",
   "category": "admin-utilities",
   "permissions": ["http.serve", "storage.kv", "network.fetch"],

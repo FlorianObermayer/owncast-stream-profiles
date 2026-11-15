@@ -12,11 +12,14 @@
 #
 # Trigger by pushing a tag that matches the manifest version:
 #
-#   npm version --no-git-tag-version patch   # keeps package-lock in step
-#   # bump "version" in plugin.manifest.json to the same value
-#   git commit -am "release 0.0.2"
-#   git tag v0.0.2
-#   git push origin main --tags
+#   npm run version:bump patch   # package.json, package-lock.json, manifest
+#   git commit -am "release 0.0.2"   # on a branch, merged by pull request
+#   # after the merge, on main:
+#   git tag v0.0.2 && git push origin v0.0.2
+#
+# `main` is protected, so the version bump lands through a PR and the tag is
+# pushed on its own afterwards. Release tags are protected against deletion and
+# update, which is why the tag is pushed only once its commit is merged.
 #
 # `scripts/check-release.mjs --tag` refuses the run when the tag and
 # plugin.manifest.json disagree, so a mistyped tag cannot publish the wrong

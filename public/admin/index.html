@@ -4,7 +4,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Stream profiles</title>
-    <link rel="stylesheet" href="./admin.css" />
+    <!-- The `?v=` is not decoration: Owncast sets a 30-day max-age on .css and
+         .js (utils.GetCacheDurationSecondsForPath), so without a changed URL a
+         browser keeps running the previous release's script after an upgrade.
+         scripts/set-version.mjs rewrites these and the release guard refuses a
+         mismatch. -->
+    <link rel="stylesheet" href="./admin.css?v=0.2.1" />
   </head>
   <body>
     <header class="sp-header">
@@ -79,6 +84,6 @@
       </form>
     </dialog>
 
-    <script src="./admin.js"></script>
+    <script src="./admin.js?v=0.2.1"></script>
   </body>
 </html>

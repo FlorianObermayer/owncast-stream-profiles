@@ -1281,9 +1281,10 @@
       "Who may watch while this profile is active. No entries means the site " +
       "is open. With entries, viewers sign in with any of these. A credential " +
       "without a username accepts any username with the right password. " +
-      "Passwords are stored as a salted hash, never in readable form. What is " +
-      "actually protected depends on the Authentication tab: the default mode " +
-      "gates the page but leaves the video stream public.";
+      "Passwords are stored as a salted hash, never in readable form. Changes " +
+      "here are saved immediately, and are not part of \"Save changes\". What " +
+      "is actually protected depends on the Authentication tab: the default " +
+      "mode gates the page but leaves the video stream public.";
     section.appendChild(hint);
 
     const list = document.createElement("div");
@@ -1341,28 +1342,48 @@
     }
 
     async function send(payload, busyControl) {
+      if (busy) return;
+      busy = true;
       if (busyControl) busyControl.disabled = true;
+
+      const id = profile.id;
+      let message = "";
+      let kind = "ok";
+
       try {
-        const result = await request(
-          API.auth,
-          Object.assign({ id: profile.id }, payload)
-        );
-        userInput.value = "";
-        passInput.value = "";
-        paint(result.credentials);
-        // The active profile's access changes with the edit, so nothing needs
-        // re-applying; say so instead of leaving the admin guessing.
-        setStatus(
-          profile.id === state.activeId
+        // A credential is stored against a profile id, so the profile has to
+        // exist server-side first. One added in this session has not been saved
+        // yet, and its credential request would 404 — which reads as "saved"
+        // until the profile is saved without it. Saving here is also what
+        // "Apply now" does, so both paths behave the same.
+        await saveProfiles(true);
+
+        const result = await request(API.auth, Object.assign({ id: id }, payload));
+
+        const target = state.profiles.find(function (candidate) {
+          return candidate.id === id;
+        });
+        if (target) target.credentials = result.credentials;
+
+        message =
+          id === state.activeId
             ? "Viewer access for the active profile updated. It applies from the next page load."
-            : "Viewer access saved for " + (profile.name || profile.id) + ".",
-          "ok"
-        );
+            : "Viewer access saved for " +
+              (target ? target.name || target.id : id) +
+              ".";
       } catch (error) {
-        setStatus(error.message, "error");
-      } finally {
-        if (busyControl) busyControl.disabled = false;
+        message = error.message;
+        kind = "error";
       }
+
+      // Every branch re-renders: the profile list, the dirty flag and the
+      // credential list may all have moved.
+      busy = false;
+      if (busyControl) busyControl.disabled = false;
+      userInput.value = "";
+      passInput.value = "";
+      render();
+      setStatus(message, kind);
     }
 
     form.appendChild(

@@ -511,6 +511,49 @@ function checkPasswordHashing() {
 }
 
 // ---------------------------------------------------------------------------
+// Admin asset cache busting
+//
+// Owncast serves .js and .css with a 30-day max-age
+// (utils.GetCacheDurationSecondsForPath), so a browser that has loaded the admin
+// page once keeps using that release's script for a month. The `?v=` query is
+// what makes an upgrade visible; if it drifts from the manifest version the
+// admin page silently shows an old UI, which reads as "the feature is missing".
+// ---------------------------------------------------------------------------
+
+function checkAssetCacheBusting(manifestVersion) {
+  const relative = "public/admin/index.html";
+  const absolute = join(ROOT, relative);
+  if (!existsSync(absolute) || !manifestVersion) return;
+
+  const html = readFileSync(absolute, "utf8");
+  const pattern = /\.\/(admin\.css|admin\.js)\?v=([^"'&]+)/g;
+  const found = [];
+  let match;
+
+  while ((match = pattern.exec(html)) !== null) {
+    found.push({ file: match[1], version: match[2] });
+  }
+
+  for (const file of ["admin.css", "admin.js"]) {
+    if (!found.some((entry) => entry.file === file)) {
+      fail(
+        `${relative} loads ${file} without a ?v= cache-busting query. ` +
+          "Owncast caches it for 30 days, so upgrades would not reach admins.",
+      );
+    }
+  }
+
+  for (const entry of found) {
+    if (entry.version !== manifestVersion) {
+      fail(
+        `${relative} loads ${entry.file} as ?v=${entry.version}, but the ` +
+          `manifest version is ${manifestVersion}. Run scripts/set-version.mjs.`,
+      );
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -521,6 +564,7 @@ function main() {
   checkInstructionsLinks();
   checkWorkflowsPinned();
   checkPasswordHashing();
+  checkAssetCacheBusting(version);
   checkTag(args.tag, version);
 
   if (args.packagePath && version) {

@@ -109,8 +109,20 @@ function main() {
     `"version": "${next}"`,
   );
 
+  // 4. public/admin/index.html — the cache-busting query on admin.css/admin.js.
+  //    Owncast serves those with a 30-day max-age, so an unchanged URL means a
+  //    browser keeps the old script after an upgrade and the admin page silently
+  //    loses whatever the release added.
+  replaceVersion(
+    "public/admin/index.html",
+    /\.\/(admin\.css|admin\.js)\?v=[0-9A-Za-z.-]+/g,
+    (match, file) => `./${file}?v=${next}`,
+  );
+
   console.log(`version ${pkg.version} -> ${next}`);
-  console.log("updated: package.json, package-lock.json, plugin.manifest.json");
+  console.log(
+    "updated: package.json, package-lock.json, plugin.manifest.json, public/admin/index.html",
+  );
   // Releasing is a merge: the release workflow finds the unreleased version on
   // main, tags the merge commit and publishes. Nothing to push by hand.
   console.log(`\nnext: commit and open a pull request; merging it releases v${next}`);

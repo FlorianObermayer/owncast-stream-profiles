@@ -106,7 +106,7 @@ That fourth one is not cosmetic: Owncast serves `.js` and `.css` with a 30-day
 `max-age` (`utils.GetCacheDurationSecondsForPath`), so a browser that has loaded
 the admin page once keeps running that release's script for a month. Without a
 changed URL an upgrade looks like a missing feature, which is exactly how 0.2.0
-appeared to have no admin login. The release guard fails when the query drifts
+appeared to have no owner login. The release guard fails when the query drifts
 from the manifest version.
 
 ```bash
@@ -210,12 +210,17 @@ Owncast's source rather than its docs:
   not, and a password-only entry added earlier silently stood in for a named
   credential — the viewer was let in as `Guest` instead of their username. Keep
   that ordering in `findMatchingCredential` and keep the test that pins it.
-* **The admin credential is profile-independent by design.** It lives at
+* **The owner login is profile-independent by design.** It lives at
   `auth-admin` rather than under a profile, `authenticate` checks it before
   password-only entries, and `onAuthCheck` accepts a session bound to
   `admin|<id>` before any profile logic runs. That ordering is what makes it a
   lockout escape hatch; moving the profile checks first would quietly break it.
   Replacing it mints a new id, which revokes the sessions it issued.
+
+  The stored key and the session scope keep their old `admin` names on purpose.
+  Only the wording is "owner login", because it grants no privileges and calling
+  it admin access was misleading. Renaming the key would discard a credential an
+  owner had already saved — losing exactly the thing that prevents lockouts.
 
 A session also records its issuer, so `onAuthCheck` denies one whose profile is
 no longer active — that is what makes "switching profile switches who can watch"

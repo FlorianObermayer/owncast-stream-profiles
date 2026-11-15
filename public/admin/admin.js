@@ -252,8 +252,7 @@
   const state = {
     profiles: [],
     activeId: "",
-    owncastUrl: "",
-    // The profile-independent admin login, as { user } or null.
+    // The profile-independent owner login, as { user } or null.
     adminAccess: null,
     // Stock images to show for an empty image field. `defaultResets.favicon`
     // means Owncast resets it natively, so there is nothing to preview.
@@ -285,7 +284,6 @@
     profiles: document.getElementById("profiles"),
     status: document.getElementById("status"),
     connection: document.getElementById("connection"),
-    target: document.getElementById("target"),
     empty: document.getElementById("empty"),
     save: document.getElementById("save"),
     add: document.getElementById("add"),
@@ -559,8 +557,7 @@
     els.connection.className = "sp-banner";
     els.connection.textContent =
       "Applying a profile or reading the server settings will ask for your " +
-      "Owncast admin password. Leave \"keep it\" ticked and it is remembered " +
-      "for this tab only.";
+      "Owncast admin password.";
   }
 
   function renderProfile(profile) {
@@ -1281,10 +1278,9 @@
       "Who may watch while this profile is active. No entries means the site " +
       "is open. With entries, viewers sign in with any of these. A credential " +
       "without a username accepts any username with the right password. " +
-      "Passwords are stored as a salted hash, never in readable form. Changes " +
-      "here are saved immediately, and are not part of \"Save changes\". What " +
-      "is actually protected depends on the Authentication tab: the default " +
-      "mode gates the page but leaves the video stream public.";
+      "Changes here are saved immediately and are not part of \"Save changes\". " +
+      "What is protected depends on the Authentication tab on this plugin's " +
+      "page: by default the page needs a sign-in but the video does not.";
     section.appendChild(hint);
 
     const list = document.createElement("div");
@@ -1402,8 +1398,9 @@
     return section;
   }
 
-  // The one credential that is not tied to a profile, and the reason it exists:
-  // a wrong profile must never lock the owner out of their own site.
+  // The one credential that is not tied to a profile: the owner's own login,
+  // not a privileged one. It grants exactly what a viewer credential does, and
+  // exists so a wrong profile cannot lock the owner out of their own site.
   function buildAdminAccessControl() {
     const section = document.createElement("div");
     section.className = "sp-field sp-access sp-admin-access";
@@ -1411,15 +1408,17 @@
     const head = document.createElement("div");
     head.className = "sp-field-head";
     const title = document.createElement("strong");
-    title.textContent = "Admin access (all profiles)";
+    title.textContent = "Owner login";
     head.appendChild(title);
     section.appendChild(head);
 
     const hint = document.createElement("p");
     hint.className = "sp-hint";
     hint.textContent =
-      "One login that always works, whatever profile is active and even when " +
-      "none is.";
+      "Your own login, for watching. It is not a privileged account: it grants " +
+      "the same access as any viewer. Because it belongs to no profile it " +
+      "always works, whatever profile is active and even when none is, so a " +
+      "mistake in a profile's viewer access cannot lock you out.";
     section.appendChild(hint);
 
     const list = document.createElement("div");
@@ -1452,7 +1451,8 @@
       if (!current) {
         const empty = document.createElement("p");
         empty.className = "sp-hint";
-        empty.textContent = "No admin login. Profiles decide access on their own.";
+        empty.textContent =
+          "No owner login. Profiles decide access on their own.";
         list.appendChild(empty);
         return;
       }
@@ -1482,8 +1482,8 @@
         paint(result.adminAccess);
         setStatus(
           result.adminAccess
-            ? "Admin login saved. It works with every profile."
-            : "Admin login removed.",
+            ? "Owner login saved. It works with every profile."
+            : "Owner login removed.",
           "ok"
         );
       } catch (error) {
@@ -1494,9 +1494,9 @@
     }
 
     form.appendChild(
-      makeButton("Save admin login", "set-admin-access", "", function () {
+      makeButton("Save owner login", "set-admin-access", "", function () {
         if (userInput.value.trim() === "" || passInput.value === "") {
-          setStatus("Enter a username and a password for the admin login.", "error");
+          setStatus("Enter a username and a password for the owner login.", "error");
           return;
         }
         send({ action: "set", user: userInput.value, password: passInput.value });
@@ -1525,10 +1525,6 @@
     els.save.disabled = busy || !dirty;
     els.save.textContent = dirty ? "Save changes" : "Saved";
 
-    els.target.textContent = state.owncastUrl
-      ? "Applies to " + state.owncastUrl
-      : "";
-
     els.forget.hidden = !cachedPassword();
 
     renderBanner();
@@ -1547,7 +1543,6 @@
       const data = await request(API.state);
       state.profiles = data.profiles || [];
       state.activeId = data.activeId || "";
-      state.owncastUrl = data.owncastUrl || "";
       state.adminAccess = data.adminAccess || null;
 
       // Loaded before the first render so image previews are correct without
@@ -1662,8 +1657,7 @@
   async function applyProfile(profile) {
     if (busy) return;
 
-    const reason =
-      "Owncast's admin API needs your admin password to change these settings.";
+    const reason = "Enter your Owncast admin password to apply these settings.";
     const password = await resolvePassword(reason);
     if (!password) {
       setStatus("Cancelled.");
@@ -1787,7 +1781,7 @@
     setStatus("Reading the current server settings…");
 
     const readReason =
-      "Owncast's admin API needs your admin password to read the current settings.";
+      "Enter your Owncast admin password to read the current settings.";
 
     try {
       const result = await withPassword(readReason, function (password) {
@@ -1830,7 +1824,7 @@
     setStatus("Testing…");
 
     const reason =
-      "Owncast's admin API needs your admin password to verify the connection.";
+      "Enter your Owncast admin password to check the connection.";
 
     try {
       const result = await withPassword(reason, function (password) {

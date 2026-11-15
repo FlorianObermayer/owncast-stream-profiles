@@ -30,6 +30,7 @@ in CI.
 | `__tests__/` | Scenario tests |
 | `scripts/check-release.mjs` | Release and security guard |
 | `scripts/set-version.mjs` | Bumps the version in all three files at once |
+| `.github/actions/verify/action.yml` | Test and package steps, shared by CI and the release |
 | `.github/images/` | Screenshots for the README |
 
 ## Adding a field
@@ -78,7 +79,12 @@ would fail to load.
 
 ## Releasing
 
-The version is recorded in three places, and all three must agree before a tag:
+Merging a version bump is the release. There is no tag to push and no second
+command: `main` moving to a version that has no release yet starts
+`.github/workflows/release.yml`, which tests the merged commit, tags it, and
+publishes `stream-profiles.ocpkg` with `SHA256SUMS.txt`.
+
+The version is recorded in three places, and all three must agree:
 `package.json`, `package-lock.json` and `plugin.manifest.json`. Use the script;
 `npm version` alone only updates the first two, and the manifest is the one the
 host and the catalog read.
@@ -86,34 +92,32 @@ host and the catalog read.
 ```bash
 npm run version:bump patch   # or minor / major / 0.1.0
 npm run release:verify
-git switch -c release/0.0.3
-git commit -am "release 0.0.3"
-git push -u origin HEAD      # then open a PR
+git switch -c release/0.0.6
+git commit -am "bump: update version to 0.0.6"
+git push -u origin HEAD      # then open a PR and merge it
 ```
 
-`main` is protected: both CI jobs must pass and the branch must be up to date
-before a merge. Tag the merge commit afterwards, on `main`, and push only the
-tag:
+`main` is protected, so the bump arrives with both CI jobs green. A run on a
+commit whose version is already released stops after a few seconds and does
+nothing, and re-running a failed publish reuses the tag it created after
+checking that the tag still points at the commit being tested.
 
-```bash
-git switch main && git pull --ff-only
-git tag v0.0.3
-git push origin v0.0.3
-```
-
-Tag after merging, never before. Release tags are protected against deletion and
-update.
+The tag is an output of the release, not an input, so it cannot land on the
+commit behind the bump. Tags stay protected against deletion and update: a wrong
+one is superseded by the next version, never moved.
 
 `scripts/check-release.mjs` refuses the run when the versions disagree, the tag
 does not match, the permission set changed, an action is not pinned to a commit
 SHA, or the package contains an unexpected file. Run it alone for the fast
 version; failures name the rule.
 
-The tag runs `.github/workflows/release.yml`: verify, test, build, checksum,
-attest provenance, then create the GitHub release with `stream-profiles.ocpkg`
-and `SHA256SUMS.txt`. Permissions are granted per job and no personal access
-token is involved.
-
+`.github/actions/verify` holds the test and package steps and is used by both CI
+and the release, so the two cannot drift. It is a composite action rather than a
+reusable workflow because a called job reports its status as
+`<caller> / <called>`, which would rename the required check in branch
+protection. A release re-runs the steps over the merged commit, independently of
+whatever CI produced, and publishes that run's package unchanged: the released
+bytes are the ones that passed, not a second build.
 ```bash
 sha256sum -c SHA256SUMS.txt
 gh attestation verify stream-profiles.ocpkg \

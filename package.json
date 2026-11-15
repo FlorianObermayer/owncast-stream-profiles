@@ -4,6 +4,9 @@
   "private": true,
   "description": "Owncast plugin: switch between named sets of stream copy, branding, discoverability, chat policy and advanced settings.",
   "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/FlorianObermayer/owncast-stream-profiles.git"

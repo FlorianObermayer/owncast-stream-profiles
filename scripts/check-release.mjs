@@ -37,6 +37,9 @@ const REQUIRED_FILES = [
   "SECURITY.md",
   "scripts/check-release.mjs",
   "scripts/set-version.mjs",
+  ".github/workflows/ci.yml",
+  ".github/workflows/release.yml",
+  ".github/actions/verify/action.yml",
   ".github/images/admin-overview.png",
   ".github/images/admin-fields.png",
   ".github/images/admin-password.png",
@@ -261,9 +264,29 @@ function checkWorkflowsPinned() {
     return;
   }
 
-  for (const file of files) {
-    const relative = `.github/workflows/${file}`;
-    const lines = readFileSync(join(dir, file), "utf8").split("\n");
+  // Composite actions carry `uses:` lines too, so they are held to the same
+  // rule. A shared action is exactly where an unpinned reference would hide:
+  // one file used by two workflows escapes a review that only reads those two.
+  const shared = [];
+  const actionsDir = join(ROOT, ".github", "actions");
+  if (existsSync(actionsDir)) {
+    for (const name of readdirSync(actionsDir)) {
+      for (const file of ["action.yml", "action.yaml"]) {
+        if (existsSync(join(actionsDir, name, file))) {
+          shared.push(`.github/actions/${name}/${file}`);
+          break;
+        }
+      }
+    }
+  }
+
+  const targets = [
+    ...files.map((file) => `.github/workflows/${file}`),
+    ...shared,
+  ];
+
+  for (const relative of targets) {
+    const lines = readFileSync(join(ROOT, relative), "utf8").split("\n");
 
     lines.forEach((line, index) => {
       const match = /^\s*(?:-\s*)?uses:\s*["']?([^\s"'#]+)/.exec(line);

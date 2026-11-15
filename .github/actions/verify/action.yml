@@ -1,0 +1,96 @@
+# Shared verification.
+#
+# CI and the release both need one answer to "may this be shipped?", so these
+# steps exist here once. Before this each workflow carried its own copy:
+# checkout, Node, install, test, package, checksum, upload. A check tightened in
+# CI simply would not apply to the release.
+#
+# A composite action rather than a reusable workflow, deliberately. A called
+# workflow reports its status as `<caller job> / <called job>`, so sharing jobs
+# would rename the required check in branch protection — verified, it turns
+# "Test and package" into "Test and package / Test and package". Sharing steps
+# leaves the job name, and therefore the check name, ours to choose.
+#
+# Callers check the repository out first, because this file lives in it.
+
+name: Verify and package
+description: Test the plugin, build the .ocpkg, and upload it as an artifact.
+
+outputs:
+  version:
+    description: Version declared by plugin.manifest.json.
+    value: ${{ steps.version.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Pin the toolchain
+      shell: bash
+      # The SDK's postinstall downloads the Owncast test/serve host binaries from
+      # that project's GitHub releases. Pin the tag so a run cannot silently
+      # adopt a newly published binary: a bump becomes a reviewable diff.
+      run: |
+        echo "OWNCAST_PLUGIN_HOST_BINARIES_VERSION=v0.11.1" >> "$GITHUB_ENV"
+        echo "NPM_CONFIG_FUND=false" >> "$GITHUB_ENV"
+        echo "NPM_CONFIG_AUDIT=false" >> "$GITHUB_ENV"
+
+    - name: Set up Node
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        # The oldest line still in support, matching the `engines` floor in
+        # package.json. Testing the floor is what catches code that only works on
+        # a newer local Node; a newer version here would hide exactly that.
+        node-version: 22
+        cache: npm
+
+    - name: Install dependencies
+      shell: bash
+      run: npm ci
+
+    - name: Dependency audit
+      shell: bash
+      # High and critical fail the run. Moderate findings are reviewed through
+      # Dependabot instead: a transitive pin sometimes needs an `overrides` entry
+      # that no automated bump can produce, which is how esbuild was moved past
+      # its advisory.
+      run: npm audit --audit-level=high
+
+    - name: Read the manifest version
+      id: version
+      shell: bash
+      run: |
+        version="$(node -p "require('./plugin.manifest.json').version")"
+        echo "version=${version}" >> "$GITHUB_OUTPUT"
+        echo "manifest declares ${version}"
+
+    - name: Check repository invariants
+      shell: bash
+      run: npm run check
+
+    - name: Run scenario tests
+      shell: bash
+      run: npm test
+
+    - name: Build the installable package
+      shell: bash
+      run: npm run package
+
+    - name: Verify the built package
+      shell: bash
+      run: npm run check:package
+
+    - name: Checksum the package
+      shell: bash
+      run: sha256sum stream-profiles.ocpkg | tee SHA256SUMS.txt
+
+    - name: Upload the package
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        # The release downloads this by the same name, so it is a constant rather
+        # than a caller input.
+        name: stream-profiles-ocpkg
+        path: |
+          stream-profiles.ocpkg
+          SHA256SUMS.txt
+        if-no-files-found: error
+        retention-days: 14

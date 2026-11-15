@@ -124,6 +124,8 @@ gh attestation verify stream-profiles.ocpkg \
   --repo FlorianObermayer/owncast-stream-profiles
 ```
 
+`gh attestation` needs `gh` 2.49 or newer; the checksum check works anywhere.
+
 Adding a **permission** is user-visible: every installed copy shows "needs
 re-approval" until an admin approves. Update `EXPECTED_PERMISSIONS` in
 `scripts/check-release.mjs` in the same commit.

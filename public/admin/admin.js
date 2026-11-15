@@ -12,6 +12,7 @@
     server: "./api/server",
     image: "./api/image",
     defaults: "./api/defaults",
+    auth: "./api/auth",
   };
 
   // Fields whose change is not visible immediately. Nothing here needs an
@@ -707,6 +708,8 @@
       card.appendChild(wrapper);
     });
 
+    card.appendChild(buildAccessControl(profile));
+
     els.profiles.appendChild(card);
   }
 
@@ -1253,6 +1256,124 @@
 
     paint();
     return wrap;
+  }
+
+  // Viewer access for one profile. Renders the credentials the server holds as
+  // a summary (usernames only, never a hash) and lets the admin add or remove
+  // them. Passwords are hashed by the plugin; they never come back here.
+  function buildAccessControl(profile) {
+    const section = document.createElement("div");
+    section.className = "sp-field sp-access";
+
+    const head = document.createElement("div");
+    head.className = "sp-field-head";
+    const title = document.createElement("strong");
+    title.textContent = "Viewer access";
+    head.appendChild(title);
+    section.appendChild(head);
+
+    const hint = document.createElement("p");
+    hint.className = "sp-hint";
+    hint.textContent =
+      "Who may watch while this profile is active. No entries means the site " +
+      "is open. With entries, viewers sign in with any of these. A credential " +
+      "without a username accepts any username with the right password. " +
+      "Passwords are stored as a salted hash, never in readable form.";
+    section.appendChild(hint);
+
+    const list = document.createElement("div");
+    list.className = "sp-access-list";
+    section.appendChild(list);
+
+    const form = document.createElement("div");
+    form.className = "sp-row sp-access-form";
+
+    const userInput = document.createElement("input");
+    userInput.type = "text";
+    userInput.placeholder = "Username (optional)";
+    userInput.autocomplete = "off";
+    userInput.spellcheck = false;
+
+    const passInput = document.createElement("input");
+    passInput.type = "password";
+    passInput.placeholder = "Password";
+    passInput.autocomplete = "new-password";
+
+    form.appendChild(userInput);
+    form.appendChild(passInput);
+
+    function paint(credentials) {
+      if (credentials) profile.credentials = credentials;
+
+      list.textContent = "";
+      const entries = profile.credentials || [];
+
+      if (!entries.length) {
+        const empty = document.createElement("p");
+        empty.className = "sp-hint";
+        empty.textContent = "No credentials: this profile leaves the site open.";
+        list.appendChild(empty);
+        return;
+      }
+
+      entries.forEach(function (entry) {
+        const row = document.createElement("div");
+        row.className = "sp-row sp-access-entry";
+
+        const name = document.createElement("span");
+        name.textContent = entry.user || "Password only";
+        if (!entry.user) name.className = "sp-hint";
+        row.appendChild(name);
+
+        row.appendChild(
+          makeButton("Remove", "remove-credential", "secondary", function () {
+            send({ action: "remove", entryId: entry.id }, row);
+          })
+        );
+
+        list.appendChild(row);
+      });
+    }
+
+    async function send(payload, busyControl) {
+      if (busyControl) busyControl.disabled = true;
+      try {
+        const result = await request(
+          API.auth,
+          Object.assign({ id: profile.id }, payload)
+        );
+        userInput.value = "";
+        passInput.value = "";
+        paint(result.credentials);
+        // The active profile's access changes with the edit, so nothing needs
+        // re-applying; say so instead of leaving the admin guessing.
+        setStatus(
+          profile.id === state.activeId
+            ? "Viewer access for the active profile updated. It applies from the next page load."
+            : "Viewer access saved for " + (profile.name || profile.id) + ".",
+          "ok"
+        );
+      } catch (error) {
+        setStatus(error.message, "error");
+      } finally {
+        if (busyControl) busyControl.disabled = false;
+      }
+    }
+
+    form.appendChild(
+      makeButton("Add credential", "add-credential", "", function () {
+        if (passInput.value === "") {
+          setStatus("Enter a password before adding a credential.", "error");
+          passInput.focus();
+          return;
+        }
+        send({ action: "add", user: userInput.value, password: passInput.value });
+      })
+    );
+
+    section.appendChild(form);
+    paint();
+    return section;
   }
 
   function makeButton(label, action, className, onClick) {

@@ -16,6 +16,10 @@ passwords, or shared passwords with no username — so switching profile switche
 who is allowed to watch. Passwords are stored as a salted hash and only ever
 leave the server as a username in the admin page.
 
+One login is deliberately **not** tied to a profile: an admin username and
+password that works whatever profile is active, and even when none is. It exists
+so a mistake in a profile's access list cannot lock the owner out.
+
 Using this makes the plugin the site's login gate, which Owncast allows only one
 plugin to be at a time. Browsers see a sign-in page rather than the native HTTP
 Basic dialog, because Owncast filters the response header a plugin would need to

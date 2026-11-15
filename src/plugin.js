@@ -41,6 +41,13 @@ const ACTIVE_KEY = "active-profile";
 // Credentials live beside their profile, never inside it: a profile round-trips
 // through the admin page, and a password hash has no business making that trip.
 const CREDENTIALS_PREFIX = "auth:";
+// One credential that is not attached to any profile. It exists so a mistake in
+// a profile cannot shut the owner out of their own site, which makes it the one
+// thing here that must not depend on the active profile.
+const ADMIN_CREDENTIAL_KEY = "auth-admin";
+// Session bindings record their issuer. Real profile ids are slugs, so this
+// sentinel cannot collide with one.
+const ADMIN_SCOPE = "admin";
 // Which profile issued a viewer's session, so switching profiles revokes the
 // sessions of the old one instead of letting them ride along.
 const SESSION_PREFIX = "auth-session:";
@@ -874,6 +881,19 @@ function deleteCredentials(profileId) {
   owncast.kv.set(credentialsKey(profileId), "");
 }
 
+function loadAdminEntry() {
+  const entries = normalizeCredentials(owncast.kv.get(ADMIN_CREDENTIAL_KEY));
+  return entries.length ? entries[0] : null;
+}
+
+function saveAdminEntry(entry) {
+  owncast.kv.set(ADMIN_CREDENTIAL_KEY, JSON.stringify([entry]));
+}
+
+function clearAdminEntry() {
+  owncast.kv.set(ADMIN_CREDENTIAL_KEY, "");
+}
+
 // Deletes the credentials of any profile that disappeared from the list, so a
 // removed profile cannot keep gating the site from orphaned storage.
 function pruneCredentials(before, after) {
@@ -885,28 +905,68 @@ function pruneCredentials(before, after) {
 }
 
 // The credential set currently in force. `known` is false when no profile is
-// active or the active id no longer names a profile.
+// active or the active id no longer names a profile. `admin` is deliberately
+// independent of both, so every caller sees it whatever the profile state.
 function activeAuth() {
+  const admin = loadAdminEntry();
   const activeId = loadActiveId();
-  if (!activeId) return { profileId: "", entries: [], known: false };
+  if (!activeId) return { profileId: "", entries: [], known: false, admin: admin };
 
   const exists = loadProfiles().some(function (profile) {
     return profile.id === activeId;
   });
-  if (!exists) return { profileId: "", entries: [], known: false };
+  if (!exists) return { profileId: "", entries: [], known: false, admin: admin };
 
   return {
     profileId: activeId,
     entries: loadCredentials(activeId),
     known: true,
+    admin: admin,
   };
 }
 
-function grantAccess(profileId, entry) {
-  // A stable, provider-free identity: one Owncast user per credential rather
-  // than per viewer, which is what a shared password can support.
+// Resolves a username and password against everything that can grant access,
+// in the order that makes the result predictable:
+//
+//   1. a profile credential that names this viewer
+//   2. the admin credential
+//   3. a profile credential with no username (accepts any)
+//
+// Named entries come first because a profile shares one salt, so two entries
+// holding the same password have identical hashes and the shared one would
+// otherwise stand in and put the viewer in chat as "Guest". The admin
+// credential is checked before the shared entries for the same reason: signing
+// in as the admin must not quietly become Guest.
+function authenticate(auth, username, password) {
+  const supplied = text(username);
+  if (text(password) === "") return null;
+
+  const named = auth.entries.filter(function (entry) {
+    return entry.user !== "";
+  });
+  const exact = findMatchingCredential(named, supplied, password);
+  if (exact) return { entry: exact, admin: false };
+
+  if (auth.admin) {
+    const admin = findMatchingCredential([auth.admin], supplied, password);
+    if (admin) return { entry: admin, admin: true };
+  }
+
+  const shared = auth.entries.filter(function (entry) {
+    return entry.user === "";
+  });
+  const wildcard = findMatchingCredential(shared, supplied, password);
+  if (wildcard) return { entry: wildcard, admin: false };
+
+  return null;
+}
+
+// scope is a profile id, or ADMIN_SCOPE. A stable, provider-free identity: one
+// Owncast user per credential rather than per viewer, which is what a shared
+// password can support.
+function grantAccess(scope, entry) {
   const entryId = entry ? entry.id : "open";
-  const authId = profileId + ":" + entryId;
+  const authId = scope + ":" + entryId;
   const displayName = entry && entry.user ? entry.user : "Guest";
 
   const registered = owncast.users.register({
@@ -919,8 +979,8 @@ function grantAccess(profileId, entry) {
   if (!userId) throw new Error("could not register the viewer identity");
 
   // Recorded before the session exists, so onAuthCheck can never see a session
-  // it cannot attribute to a profile.
-  owncast.kv.set(SESSION_PREFIX + userId, profileId + "|" + entryId);
+  // it cannot attribute to an issuer.
+  owncast.kv.set(SESSION_PREFIX + userId, scope + "|" + entryId);
   owncast.auth.grantSession({ userId: userId });
 
   return userId;
@@ -1071,14 +1131,24 @@ function gateEntry(req) {
   const returnTo = safeReturnTo(query.return_to);
 
   if (!auth.known) {
-    // Closed rather than open: with no profile the operator has expressed no
-    // intent, and opening the site is the wrong guess for a gate.
+    // Without a profile the operator has expressed no intent, so the site stays
+    // closed. The admin credential is the exception: it exists precisely so a
+    // profile mistake cannot lock the owner out, so it still gets a login page.
+    if (!auth.admin) {
+      return htmlResponse(
+        200,
+        blockedPage("No profile is active. The owner needs to apply one in the admin."),
+      );
+    }
     return htmlResponse(
       200,
-      blockedPage("No profile is active. The owner needs to apply one in the admin."),
+      loginPage({ returnTo: returnTo, showUsername: true, message: "No profile is active." }),
     );
   }
 
+  // An open profile stays open even when an admin credential exists: "no
+  // credentials" means "let everyone in", and adding a separate admin login
+  // must not silently change that.
   if (!auth.entries.length) {
     try {
       grantAccess(auth.profileId, null);
@@ -1097,14 +1167,10 @@ function gateEntry(req) {
     if (!credentials) {
       return plainResponse(401, "Expected HTTP Basic credentials.");
     }
-    const entry = findMatchingCredential(
-      auth.entries,
-      credentials.user,
-      credentials.password,
-    );
-    if (!entry) return plainResponse(401, "Invalid credentials.");
+    const match = authenticate(auth, credentials.user, credentials.password);
+    if (!match) return plainResponse(401, "Invalid credentials.");
     try {
-      grantAccess(auth.profileId, entry);
+      grantAccess(match.admin ? ADMIN_SCOPE : auth.profileId, match.entry);
     } catch (error) {
       owncast.log.error(
         "stream-profiles: could not start a session: " + describeError(error),
@@ -1116,13 +1182,18 @@ function gateEntry(req) {
 
   return htmlResponse(
     200,
-    loginPage({
-      returnTo: returnTo,
-      showUsername: auth.entries.some(function (entry) {
-        return entry.user !== "";
-      }),
-    }),
+    loginPage({ returnTo: returnTo, showUsername: showsUsernameField(auth) }),
   );
+}
+
+// The username input is only useful when something actually checks a username:
+// a named profile credential or the admin one. A profile with only shared
+// passwords keeps the single-field form.
+function showsUsernameField(auth) {
+  if (auth.admin) return true;
+  return auth.entries.some(function (entry) {
+    return entry.user !== "";
+  });
 }
 
 // POST /auth/login — the only place a password may arrive. Deliberately not
@@ -1132,26 +1203,26 @@ function gateLogin(req) {
   const form = parseFormBody(req.body);
   const returnTo = safeReturnTo(form.return_to);
 
-  if (!auth.known || !auth.entries.length) {
+  // Nothing can authenticate: an open profile needs no password, and with no
+  // profile and no admin credential the site is closed by gateEntry.
+  if ((!auth.known || !auth.entries.length) && !auth.admin) {
     return redirectTo(returnTo);
   }
 
-  const entry = findMatchingCredential(auth.entries, text(form.user), text(form.password));
-  if (!entry) {
+  const match = authenticate(auth, text(form.user), text(form.password));
+  if (!match) {
     return htmlResponse(
       401,
       loginPage({
         returnTo: returnTo,
-        message: "That password is not correct.",
-        showUsername: auth.entries.some(function (candidate) {
-          return candidate.user !== "";
-        }),
+        message: "That username and password do not match.",
+        showUsername: showsUsernameField(auth),
       }),
     );
   }
 
   try {
-    grantAccess(auth.profileId, entry);
+    grantAccess(match.admin ? ADMIN_SCOPE : auth.profileId, match.entry);
   } catch (error) {
     owncast.log.error(
       "stream-profiles: could not start a session: " + describeError(error),
@@ -1174,6 +1245,49 @@ function gateLogout(req) {
   if (user && user.id) owncast.kv.set(SESSION_PREFIX + user.id, "");
   owncast.auth.endSession();
   return redirectTo("/");
+}
+
+// The profile-independent admin credential. One at a time, so "set" replaces.
+//
+// Replacing gives it a new id, which deliberately ends the sessions it issued:
+// the reason to change an admin password is usually that it leaked, and a
+// sliding session would otherwise keep the holder signed in indefinitely.
+function adminAccessAction(body) {
+  const action = text(body.action) || "set";
+
+  if (action === "clear") {
+    clearAdminEntry();
+    owncast.log.info("stream-profiles: admin access credential removed");
+    return jsonResponse(200, { ok: true, adminAccess: null });
+  }
+
+  if (action !== "set") {
+    return jsonResponse(400, { error: "Unknown action: " + action });
+  }
+
+  const user = text(body.user).trim();
+  const password = text(body.password);
+
+  if (user === "") {
+    return jsonResponse(400, { error: "Enter a username for the admin login." });
+  }
+  if (user.indexOf(":") !== -1) {
+    return jsonResponse(400, { error: "A username cannot contain a colon." });
+  }
+  if (password === "") {
+    return jsonResponse(400, { error: "Enter a password." });
+  }
+
+  const salt = newSalt();
+  saveAdminEntry({
+    id: "admin-" + newSalt().slice(0, 8),
+    user: user,
+    salt: salt,
+    hash: hashPassword(password, salt),
+  });
+
+  owncast.log.info('stream-profiles: admin access credential set for "' + user + '"');
+  return jsonResponse(200, { ok: true, adminAccess: { user: user } });
 }
 
 // Credential management for one profile. Passwords arrive here, are hashed
@@ -1272,11 +1386,14 @@ function parseBody(body) {
 
 function statePayload() {
   const stored = storedProfiles();
+  const admin = loadAdminEntry();
   return {
     profiles: profilesForClient(loadProfiles()),
     activeId: loadActiveId(),
     owncastUrl: baseUrl(),
     seeded: stored === undefined || stored === null || stored === "",
+    // Username only, like every other credential summary.
+    adminAccess: admin ? { user: admin.user } : null,
   };
 }
 
@@ -1472,28 +1589,53 @@ module.exports = definePlugin({
       return jsonResponse(200, { ok: true, profile: result.profile });
     }
 
+    // The profile-independent admin credential. Separate from the per-profile
+    // endpoint above so it can never be reached through a profile id.
+    if (req.method === "GET" && path === "/admin/api/admin-access") {
+      const entry = loadAdminEntry();
+      return jsonResponse(200, { adminAccess: entry ? { user: entry.user } : null });
+    }
+
+    if (req.method === "POST" && path === "/admin/api/admin-access") {
+      return adminAccessAction(parseBody(req.body) || {});
+    }
+
     return jsonResponse(404, { error: "Not found" });
   },
 
   // Called by the host on a viewer's page load, for the active gate plugin
   // only. Fails closed: an unreadable session is ended, not honoured.
   onAuthCheck(req) {
+    const user = req && req.user;
+    if (!user || !user.id) return authCheck.deny("no viewer identity");
+
+    const binding = hasSessionBinding(user.id);
+    const parts = binding === "" ? [] : binding.split("|");
     const auth = activeAuth();
+
+    // The admin credential is the lockout escape hatch, so its sessions are
+    // checked before anything profile-related: they must survive a profile
+    // switch and a missing profile, which is the whole point of it existing.
+    if (parts[0] === ADMIN_SCOPE) {
+      if (!auth.admin || auth.admin.id !== parts[1]) {
+        return authCheck.deny("the admin credential was removed or replaced");
+      }
+      return authCheck.refresh({ ttl: SESSION_RENEW_SECONDS });
+    }
 
     if (!auth.known) {
       return authCheck.deny("no profile is active");
     }
 
-    // An open profile has nothing to revoke; keep whatever session exists.
+    // An open profile admits anyone, so there is nothing to revoke and no
+    // reason to end a session we cannot attribute: the viewer would be granted
+    // a new one on the next request anyway.
     if (!auth.entries.length) return authCheck.ok();
 
-    const user = req && req.user;
-    if (!user || !user.id) return authCheck.deny("no viewer identity");
+    if (binding === "") {
+      return authCheck.deny("session does not belong to a credential");
+    }
 
-    const binding = hasSessionBinding(user.id);
-    if (binding === "") return authCheck.deny("session does not belong to a profile");
-
-    const parts = binding.split("|");
     if (parts[0] !== auth.profileId) {
       return authCheck.deny("a different profile is active");
     }

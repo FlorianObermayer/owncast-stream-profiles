@@ -197,10 +197,21 @@ Owncast's source rather than its docs:
   roughly 0.75 s per check against a 5 s handler budget. 4096 was measured to
   time out. Salting stops a leaked digest being a direct lookup; the iteration
   count is a speed bump, not a KDF, so password strength still matters.
+* **A shared salt makes identical passwords identical hashes**, so matching must
+  prefer an entry that names the viewer over a password-only one. `0.1.1` did
+  not, and a password-only entry added earlier silently stood in for a named
+  credential — the viewer was let in as `Guest` instead of their username. Keep
+  that ordering in `findMatchingCredential` and keep the test that pins it.
+* **The admin credential is profile-independent by design.** It lives at
+  `auth-admin` rather than under a profile, `authenticate` checks it before
+  password-only entries, and `onAuthCheck` accepts a session bound to
+  `admin|<id>` before any profile logic runs. That ordering is what makes it a
+  lockout escape hatch; moving the profile checks first would quietly break it.
+  Replacing it mints a new id, which revokes the sessions it issued.
 
-A session also records the profile that issued it, so `onAuthCheck` denies one
-whose profile is no longer active — that is what makes "switching profile
-switches who can watch" true rather than decorative.
+A session also records its issuer, so `onAuthCheck` denies one whose profile is
+no longer active — that is what makes "switching profile switches who can watch"
+true rather than decorative.
 
 The `basic-auth` example in the SDK is worth reading for the shape of the flow,
 but not for its details: it submits the password in a GET query string. Passwords

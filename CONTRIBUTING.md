@@ -171,7 +171,7 @@ serving `GET /plugins` and `GET /plugins/<slug>` with
 ## Viewer authentication
 
 A profile can carry viewer credentials, so the plugin holds `auth.gate` and
-`users.register`. Four constraints shape the code; each was established against
+`users.register`. Six constraints shape the code; each was established against
 Owncast's source rather than its docs:
 
 * **A plugin cannot prompt for HTTP Basic auth.** `services/plugins/server.go`
@@ -181,14 +181,30 @@ Owncast's source rather than its docs:
   send it themselves are accepted.
 * **Only one `auth.gate` plugin may be enabled.** This plugin replaces any other
   authentication plugin rather than coexisting with it.
+* **How much is gated is the operator's setting, not the plugin's.**
+  `pluginhost/authgate.go` reads a host-owned access mode: the default leaves
+  `/hls/*` and `/api/status` exempt, and only the stricter modes gate them.
+  Credentials therefore do not imply a private stream, and the docs say so.
+* **`onAuthCheck` runs only on a `GET /` navigation**, never on the HLS hot path,
+  so revocation is page-load granularity. A viewer already watching keeps the
+  stream until they reload; the session TTL is the hard backstop.
+* **The host's session TTL is absolute, 24 h by default**
+  (`plugins.DefaultSessionTTL`). Returning `authCheck.refresh({ ttl })` on a
+  valid page load makes it sliding, which is why `onAuthCheck` refreshes rather
+  than merely accepts.
 * **The round count in `src/auth.js` is measured, not chosen for taste.** SHA-256
   costs about 1.5 ms per round on the embedded interpreter, so `ROUNDS = 512` is
   roughly 0.75 s per check against a 5 s handler budget. 4096 was measured to
   time out. Salting stops a leaked digest being a direct lookup; the iteration
   count is a speed bump, not a KDF, so password strength still matters.
-* **A session records the profile that issued it.** `onAuthCheck` denies a
-  session whose profile is no longer active, which is what makes "switching
-  profile switches who can watch" true rather than decorative.
+
+A session also records the profile that issued it, so `onAuthCheck` denies one
+whose profile is no longer active — that is what makes "switching profile
+switches who can watch" true rather than decorative.
+
+The `basic-auth` example in the SDK is worth reading for the shape of the flow,
+but not for its details: it submits the password in a GET query string. Passwords
+belong in a POST body here, which is why the login route is POST only.
 
 When changing credentials, keep the salt and hash server-side: the admin page is
 only ever sent `{ id, user, passwordOnly }`.

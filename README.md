@@ -19,8 +19,12 @@ leave the server as a username in the admin page.
 Using this makes the plugin the site's login gate, which Owncast allows only one
 plugin to be at a time. Browsers see a sign-in page rather than the native HTTP
 Basic dialog, because Owncast filters the response header a plugin would need to
-prompt one. Players and scripts that send `Authorization: Basic` themselves are
-accepted.
+prompt one.
+
+The gate covers whatever Owncast's **Authentication** tab says it covers. In the
+default *Website only* mode the page is protected but `/hls/*` stays public, so
+choose a stricter mode if the video itself must be private. See
+[INSTRUCTIONS.md](INSTRUCTIONS.md).
 
 ## Install
 

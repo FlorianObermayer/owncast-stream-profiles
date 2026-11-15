@@ -1398,9 +1398,7 @@
     hint.className = "sp-hint";
     hint.textContent =
       "One login that always works, whatever profile is active and even when " +
-      "none is. Use it so a mistake in a profile's viewer access cannot lock " +
-      "you out. It appears in chat under its own username. Changing it signs " +
-      "out anyone using the old one.";
+      "none is.";
     section.appendChild(hint);
 
     const list = document.createElement("div");

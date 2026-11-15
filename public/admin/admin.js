@@ -162,6 +162,15 @@
       hint: "Announce viewers joining and leaving chat.",
     },
     {
+      key: "suggestedUsernames",
+      label: "Suggested chat usernames",
+      type: "list",
+      group: "Chat",
+      hint:
+        "Names Owncast picks from for viewers who have not signed in. At least " +
+        "10 are needed, otherwise Owncast makes up names of its own.",
+    },
+    {
       key: "hideViewerCount",
       label: "Hide viewer count",
       type: "boolean",
@@ -237,6 +246,7 @@
   // Fields a new profile starts out not touching. These are site or
   // infrastructure settings: rewriting them from a stream profile is legal,
   // but doing it by surprise clears a theme, a CDN host, or the chat policy.
+  // Mirrors DEFAULT_SKIPPED in src/plugin.js.
   const DEFAULT_SKIPPED = [
     "serverName",
     "videoServingEndpoint",
@@ -247,6 +257,7 @@
     "disableSearchIndexing",
     "externalActions",
     "socialHandles",
+    "suggestedUsernames",
   ];
 
   const state = {

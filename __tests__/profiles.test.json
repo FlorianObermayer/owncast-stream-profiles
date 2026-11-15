@@ -52,7 +52,7 @@
     ],
     "expect": {
       "kv": {
-        "profiles": "[{\"id\":\"a\",\"name\":\"A\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"suggestedUsernames\":[],\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
       }
     }
   },
@@ -76,7 +76,7 @@
     ],
     "expect": {
       "kv": {
-        "profiles": "[{\"id\":\"a\",\"name\":\"A\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[\"familie\",\"event\"],\"nsfw\":true,\"directoryEnabled\":true,\"autoplay\":\"off\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[\"familie\",\"event\"],\"nsfw\":true,\"directoryEnabled\":true,\"autoplay\":\"off\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"suggestedUsernames\":[],\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
       }
     }
   },
@@ -100,7 +100,7 @@
     ],
     "expect": {
       "kv": {
-        "profiles": "[{\"id\":\"a\",\"name\":\"A\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"suggestedUsernames\":[],\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
       }
     }
   },
@@ -124,7 +124,7 @@
     ],
     "expect": {
       "kv": {
-        "profiles": "[{\"id\":\"a\",\"name\":\"A\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[{\"title\":\"Photos\",\"url\":\"https://example.com/p\",\"description\":\"\",\"html\":\"\",\"icon\":\"\",\"color\":\"\",\"openExternally\":false},{\"title\":\"Embed\",\"url\":\"\",\"description\":\"\",\"html\":\"<p>hi</p>\",\"icon\":\"\",\"color\":\"\",\"openExternally\":false}],\"socialHandles\":[{\"platform\":\"github\",\"url\":\"https://github.com/x\",\"icon\":\"\"}],\"logo\":false,\"favicon\":false}]"
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"suggestedUsernames\":[],\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[{\"title\":\"Photos\",\"url\":\"https://example.com/p\",\"description\":\"\",\"html\":\"\",\"icon\":\"\",\"color\":\"\",\"openExternally\":false},{\"title\":\"Embed\",\"url\":\"\",\"description\":\"\",\"html\":\"<p>hi</p>\",\"icon\":\"\",\"color\":\"\",\"openExternally\":false}],\"socialHandles\":[{\"platform\":\"github\",\"url\":\"https://github.com/x\",\"icon\":\"\"}],\"logo\":false,\"favicon\":false}]"
       }
     }
   },
@@ -148,7 +148,7 @@
     ],
     "expect": {
       "kv": {
-        "profiles": "[{\"id\":\"a\",\"name\":\"A\",\"skip\":[\"tags\",\"nsfw\"],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\",\"skip\":[\"tags\",\"nsfw\"],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"suggestedUsernames\":[],\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]"
       }
     }
   },
@@ -208,7 +208,7 @@
     ],
     "expect": {
       "kv": {
-        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]",
+        "profiles": "[{\"id\":\"k\",\"name\":\"K\",\"skip\":[],\"serverName\":\"\",\"streamTitle\":\"\",\"summary\":\"\",\"welcomeMessage\":\"\",\"offlineMessage\":\"\",\"extraPageContent\":\"\",\"tags\":[],\"nsfw\":false,\"directoryEnabled\":false,\"autoplay\":\"always\",\"chatDisabled\":false,\"chatJoinMessagesEnabled\":false,\"suggestedUsernames\":[],\"hideViewerCount\":false,\"disableSearchIndexing\":false,\"federationGoLiveMessage\":\"\",\"videoServingEndpoint\":\"\",\"customStyles\":\"\",\"customJavascript\":\"\",\"externalActions\":[],\"socialHandles\":[],\"logo\":false,\"favicon\":false}]",
         "image:k:logo": "data:image/png;base64,iVBORw0KGgo="
       }
     }
@@ -787,7 +787,7 @@
         {
           "url": "http://127.0.0.1:8080/api/admin/serverconfig",
           "status": 200,
-          "body": "{\"instanceDetails\":{\"streamTitle\":\"Live\",\"tags\":[\"familie\"]},\"yp\":{\"enabled\":true},\"federation\":{\"goLiveMessage\":\"we are live\"}}"
+          "body": "{\"instanceDetails\":{\"streamTitle\":\"Live\",\"tags\":[\"familie\"]},\"yp\":{\"enabled\":true},\"federation\":{\"goLiveMessage\":\"we are live\"},\"suggestedUsernames\":[\"Ada\",\"Grace\"]}"
         }
       ]
     },
@@ -1115,5 +1115,123 @@
         }
       ]
     }
+  },
+  {
+    "name": "a profile can apply its own suggested chat usernames",
+    "given": {
+      "config": {
+        "owncastUrl": "http://127.0.0.1:8080"
+      },
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\",\"skip\":[],\"suggestedUsernames\":[\"Ada\",\"Grace\"]}]"
+      },
+      "httpResponses": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/*",
+          "status": 200,
+          "body": "{\"success\":true,\"message\":\"changed\"}"
+        }
+      ]
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/apply",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\":\"a\",\"password\":\"pw\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 200
+          }
+        }
+      }
+    ],
+    "expect": {
+      "httpRequests": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/chat/suggestedusernames",
+          "method": "POST",
+          "body": "{\"value\":[\"Ada\",\"Grace\"]}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "a profile captured before a field existed leaves it alone",
+    "given": {
+      "config": {
+        "owncastUrl": "http://127.0.0.1:8080"
+      },
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\",\"skip\":[],\"streamTitle\":\"T\"}]"
+      },
+      "httpResponses": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/*",
+          "status": 200,
+          "body": "{\"success\":true,\"message\":\"changed\"}"
+        }
+      ]
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/apply",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"id\":\"a\",\"password\":\"pw\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 200
+          }
+        }
+      }
+    ],
+    "expect": {
+      "httpRequests": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/config/streamtitle",
+          "method": "POST",
+          "body": "{\"value\":\"T\"}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "capture reads the suggested chat usernames from the server config",
+    "given": {
+      "config": {
+        "owncastUrl": "http://127.0.0.1:8080"
+      },
+      "httpResponses": [
+        {
+          "url": "http://127.0.0.1:8080/api/admin/serverconfig",
+          "status": 200,
+          "body": "{\"instanceDetails\":{\"streamTitle\":\"Live\",\"tags\":[\"familie\"]},\"yp\":{\"enabled\":true},\"federation\":{\"goLiveMessage\":\"we are live\"},\"suggestedUsernames\":[\"Ada\",\"Grace\"]}"
+        }
+      ]
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/server",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"password\":\"pw\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 200,
+            "bodyContains": "\"suggestedUsernames\":[\"Ada\",\"Grace\"]"
+          }
+        }
+      }
+    ]
   }
 ]

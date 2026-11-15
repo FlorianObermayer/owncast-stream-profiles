@@ -24,6 +24,9 @@ gh attestation verify stream-profiles.ocpkg \
   --repo FlorianObermayer/owncast-stream-profiles
 ```
 
+`gh attestation` needs `gh` 2.49 or newer. Debian packages are older than that;
+compare the file against `SHA256SUMS.txt` instead, which needs only `sha256sum`.
+
 ## Set up
 
 One setting: `owncastUrl` in **Plugins → Stream Profiles → Settings**. Then press

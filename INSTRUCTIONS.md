@@ -94,6 +94,11 @@ To end a session on this device, visit
 
 ## Notes
 
+* **Suggested chat usernames** let each profile supply the list of names Owncast
+  picks from for viewers who have not signed in. It needs **at least 10 names**;
+  a shorter list is ignored and Owncast invents its own names instead. It is
+  switched off by default, because clearing the list you already had would be
+  surprising.
 * Applying a profile with a stream title asks Owncast to announce the new title
   in chat.
 * Requires Owncast `0.3.0` or newer.

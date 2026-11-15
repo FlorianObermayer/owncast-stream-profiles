@@ -184,6 +184,21 @@ const FIELD_SPECS = [
     capture: (details, root) => Boolean(root.chatJoinMessagesEnabled),
   },
   {
+    // The pool Owncast picks a display name from for viewers who have not
+    // signed in. Owncast uses it only when it holds at least
+    // minSuggestedUsernamePoolLength (10) entries and otherwise generates
+    // phrases instead, so a shorter list is silently ignored — the admin page
+    // says so next to the field.
+    //
+    // Not in the /serverconfig `instanceDetails` object, unlike the fields
+    // above it.
+    key: "suggestedUsernames",
+    label: "Suggested chat usernames",
+    path: "/config/chat/suggestedusernames",
+    type: "list",
+    capture: (details, root) => root.suggestedUsernames,
+  },
+  {
     key: "hideViewerCount",
     label: "Hide viewer count",
     path: "/config/hideviewercount",
@@ -301,7 +316,9 @@ function defaultImageData(field) {
 
 // Fields a profile never touches unless the admin opts in. These are site or
 // infrastructure settings: rewriting them from a stream profile is legal, but
-// doing it by surprise clears a theme, a CDN host, or the chat policy.
+// doing it by surprise clears a theme, a CDN host, or the chat policy. The same
+// reasoning applies to a field added late: a profile captured before it existed
+// holds an empty value, and applying that would wipe whatever is configured now.
 const DEFAULT_SKIPPED = [
   "serverName",
   "videoServingEndpoint",
@@ -312,6 +329,9 @@ const DEFAULT_SKIPPED = [
   "disableSearchIndexing",
   "externalActions",
   "socialHandles",
+  // A profile captured before this field existed has an empty list, and
+  // applying it would otherwise clear the operator's real one.
+  "suggestedUsernames",
 ];
 
 // Starting point for a fresh install. Delete or rename them freely.
@@ -650,8 +670,15 @@ function normalizeSkip(input) {
 
 // Coerces whatever the admin page posted into the shape the plugin stores:
 // stable unique ids, values parsed per field type, no extra keys.
-function normalizeProfiles(input) {
+function normalizeProfiles(input, options) {
   if (!Array.isArray(input)) return [];
+
+  // Applied only when reading profiles off the shelf, never to profiles arriving
+  // from the admin page. A profile stored before a field existed has no value
+  // for it, and normalising fills in an empty default; applying that would wipe
+  // whatever the server is configured with now. Skipping it keeps an upgrade
+  // from silently erasing a setting the operator never touched.
+  const skipMissing = Boolean(options && options.skipMissingFields);
 
   const taken = {};
   const profiles = [];
@@ -676,7 +703,16 @@ function normalizeProfiles(input) {
       const spec = FIELD_SPECS[i];
       profile[spec.key] = normalizeFieldValue(spec, raw[spec.key]);
     }
-    profile.skip = normalizeSkip(raw.skip);
+
+    const skip = normalizeSkip(raw.skip);
+    if (skipMissing) {
+      for (let i = 0; i < FIELD_SPECS.length; i += 1) {
+        const key = FIELD_SPECS[i].key;
+        const known = Object.prototype.hasOwnProperty.call(raw, key);
+        if (!known && skip.indexOf(key) === -1) skip.push(key);
+      }
+    }
+    profile.skip = skip;
 
     profiles.push(profile);
   }
@@ -693,7 +729,7 @@ function loadProfiles() {
   if (stored === undefined || stored === null || stored === "") {
     return normalizeProfiles(SEED_PROFILES);
   }
-  return normalizeProfiles(parseJson(stored));
+  return normalizeProfiles(parseJson(stored), { skipMissingFields: true });
 }
 
 function loadActiveId() {

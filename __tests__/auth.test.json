@@ -176,7 +176,7 @@
           "body": "user=alice&password=wrong",
           "expect": {
             "status": 401,
-            "bodyContains": "That password is not correct"
+            "bodyContains": "That username and password do not match"
           }
         }
       }
@@ -652,5 +652,386 @@
         }
       ]
     }
+  },
+  {
+    "name": "the admin credential lets the owner in when a profile requires a password",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/auth/login",
+          "headers": {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          "body": "user=owner&password=secret",
+          "expect": {
+            "status": 302
+          }
+        }
+      }
+    ],
+    "expect": {
+      "userRegistrations": [
+        {
+          "authId": "admin:admin-1",
+          "displayName": "owner"
+        }
+      ],
+      "sessionGrants": [
+        {
+          "userId": "u-admin:admin-1"
+        }
+      ]
+    }
+  },
+  {
+    "name": "the admin credential opens the site when no profile is active",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/auth/login",
+          "headers": {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          "body": "user=owner&password=secret",
+          "expect": {
+            "status": 302
+          }
+        }
+      }
+    ],
+    "expect": {
+      "sessionGrants": [
+        {
+          "userId": "u-admin:admin-1"
+        }
+      ]
+    }
+  },
+  {
+    "name": "with no profile and no admin credential the site stays closed",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "GET",
+          "path": "/",
+          "expect": {
+            "status": 200,
+            "bodyContains": "No profile is active"
+          }
+        }
+      }
+    ],
+    "expect": {
+      "sessionGrants": []
+    }
+  },
+  {
+    "name": "no profile with an admin credential shows a login page rather than the blocked page",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "GET",
+          "path": "/",
+          "expect": {
+            "status": 200,
+            "bodyContains": "name=\"user\""
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "the admin credential is accepted through the Authorization header",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "GET",
+          "path": "/",
+          "headers": {
+            "Authorization": "Basic b3duZXI6c2VjcmV0"
+          },
+          "expect": {
+            "status": 302
+          }
+        }
+      }
+    ],
+    "expect": {
+      "userRegistrations": [
+        {
+          "authId": "admin:admin-1",
+          "displayName": "owner"
+        }
+      ]
+    }
+  },
+  {
+    "name": "an open profile stays open despite an admin credential",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "GET",
+          "path": "/",
+          "expect": {
+            "status": 302
+          }
+        }
+      }
+    ],
+    "expect": {
+      "userRegistrations": [
+        {
+          "authId": "a:open",
+          "displayName": "Guest"
+        }
+      ],
+      "sessionGrants": [
+        {
+          "userId": "u-a:open"
+        }
+      ]
+    }
+  },
+  {
+    "name": "an admin session survives a profile switch",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"},{\"id\":\"b\",\"name\":\"B\"}]",
+        "active-profile": "b",
+        "auth:b": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
+        "auth-session:u-admin:admin-1": "admin|admin-1"
+      }
+    },
+    "events": [
+      {
+        "authCheck": {
+          "user": {
+            "id": "u-admin:admin-1",
+            "displayName": "owner"
+          },
+          "expect": {
+            "action": "refresh"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "an admin session survives having no active profile",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
+        "auth-session:u-admin:admin-1": "admin|admin-1"
+      }
+    },
+    "events": [
+      {
+        "authCheck": {
+          "user": {
+            "id": "u-admin:admin-1",
+            "displayName": "owner"
+          },
+          "expect": {
+            "action": "refresh"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "an admin session ends when the admin credential is replaced",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
+        "auth-session:u-admin:old": "admin|admin-0"
+      }
+    },
+    "events": [
+      {
+        "authCheck": {
+          "user": {
+            "id": "u-admin:old",
+            "displayName": "owner"
+          },
+          "expect": {
+            "action": "deny"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "a wrong admin password is refused",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/auth/login",
+          "headers": {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          "body": "user=owner&password=wrong",
+          "expect": {
+            "status": 401
+          }
+        }
+      }
+    ],
+    "expect": {
+      "sessionGrants": []
+    }
+  },
+  {
+    "name": "setting the admin credential requires a username",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/admin-access",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"action\":\"set\",\"user\":\"\",\"password\":\"x\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 400,
+            "bodyContains": "username"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "the admin credential summary never carries a salt or a hash",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "GET",
+          "path": "/admin/api/admin-access",
+          "authenticated": true,
+          "expect": {
+            "status": 200,
+            "body": "{\"adminAccess\":{\"user\":\"owner\"}}"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "setting the admin credential stores only a hash",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/admin-access",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"action\":\"set\",\"user\":\"owner\",\"password\":\"hunter2\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 200,
+            "body": "{\"ok\":true,\"adminAccess\":{\"user\":\"owner\"}}"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "the admin credential can be cleared",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/admin/api/admin-access",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"action\":\"clear\"}",
+          "authenticated": true,
+          "expect": {
+            "status": 200,
+            "body": "{\"ok\":true,\"adminAccess\":null}"
+          }
+        }
+      }
+    ]
   }
 ]

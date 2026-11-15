@@ -13,6 +13,7 @@
     image: "./api/image",
     defaults: "./api/defaults",
     auth: "./api/auth",
+    adminAccess: "./api/admin-access",
   };
 
   // Fields whose change is not visible immediately. Nothing here needs an
@@ -252,6 +253,8 @@
     profiles: [],
     activeId: "",
     owncastUrl: "",
+    // The profile-independent admin login, as { user } or null.
+    adminAccess: null,
     // Stock images to show for an empty image field. `defaultResets.favicon`
     // means Owncast resets it natively, so there is nothing to preview.
     defaultImages: { logo: "", favicon: "" },
@@ -1378,6 +1381,114 @@
     return section;
   }
 
+  // The one credential that is not tied to a profile, and the reason it exists:
+  // a wrong profile must never lock the owner out of their own site.
+  function buildAdminAccessControl() {
+    const section = document.createElement("div");
+    section.className = "sp-field sp-access sp-admin-access";
+
+    const head = document.createElement("div");
+    head.className = "sp-field-head";
+    const title = document.createElement("strong");
+    title.textContent = "Admin access (all profiles)";
+    head.appendChild(title);
+    section.appendChild(head);
+
+    const hint = document.createElement("p");
+    hint.className = "sp-hint";
+    hint.textContent =
+      "One login that always works, whatever profile is active and even when " +
+      "none is. Use it so a mistake in a profile's viewer access cannot lock " +
+      "you out. It appears in chat under its own username. Changing it signs " +
+      "out anyone using the old one.";
+    section.appendChild(hint);
+
+    const list = document.createElement("div");
+    list.className = "sp-access-list";
+    section.appendChild(list);
+
+    const form = document.createElement("div");
+    form.className = "sp-row sp-access-form";
+
+    const userInput = document.createElement("input");
+    userInput.type = "text";
+    userInput.placeholder = "Username";
+    userInput.autocomplete = "off";
+    userInput.spellcheck = false;
+
+    const passInput = document.createElement("input");
+    passInput.type = "password";
+    passInput.placeholder = "Password";
+    passInput.autocomplete = "new-password";
+
+    form.appendChild(userInput);
+    form.appendChild(passInput);
+
+    function paint(adminAccess) {
+      if (adminAccess !== undefined) state.adminAccess = adminAccess;
+
+      list.textContent = "";
+      const current = state.adminAccess;
+
+      if (!current) {
+        const empty = document.createElement("p");
+        empty.className = "sp-hint";
+        empty.textContent = "No admin login. Profiles decide access on their own.";
+        list.appendChild(empty);
+        return;
+      }
+
+      const row = document.createElement("div");
+      row.className = "sp-row sp-access-entry";
+
+      const name = document.createElement("span");
+      name.textContent = current.user;
+      row.appendChild(name);
+
+      row.appendChild(
+        makeButton("Remove", "remove-admin-access", "secondary", function () {
+          send({ action: "clear" }, row);
+        })
+      );
+
+      list.appendChild(row);
+    }
+
+    async function send(payload, busyControl) {
+      if (busyControl) busyControl.disabled = true;
+      try {
+        const result = await request(API.adminAccess, payload);
+        userInput.value = "";
+        passInput.value = "";
+        paint(result.adminAccess);
+        setStatus(
+          result.adminAccess
+            ? "Admin login saved. It works with every profile."
+            : "Admin login removed.",
+          "ok"
+        );
+      } catch (error) {
+        setStatus(error.message, "error");
+      } finally {
+        if (busyControl) busyControl.disabled = false;
+      }
+    }
+
+    form.appendChild(
+      makeButton("Save admin login", "set-admin-access", "", function () {
+        if (userInput.value.trim() === "" || passInput.value === "") {
+          setStatus("Enter a username and a password for the admin login.", "error");
+          return;
+        }
+        send({ action: "set", user: userInput.value, password: passInput.value });
+      })
+    );
+
+    section.appendChild(form);
+    paint();
+    return section;
+  }
+
   function makeButton(label, action, className, onClick) {
     const button = document.createElement("button");
     button.type = "button";
@@ -1402,6 +1513,7 @@
     els.forget.hidden = !cachedPassword();
 
     renderBanner();
+    els.profiles.appendChild(buildAdminAccessControl());
     state.profiles.forEach(renderProfile);
   }
 
@@ -1417,6 +1529,7 @@
       state.profiles = data.profiles || [];
       state.activeId = data.activeId || "";
       state.owncastUrl = data.owncastUrl || "";
+      state.adminAccess = data.adminAccess || null;
 
       // Loaded before the first render so image previews are correct without
       // a second pass over the list.

@@ -83,6 +83,29 @@ A reverse proxy doing its own `auth_basic` has the same trade-off and sees the
 requests before Owncast does — if one is in place, remove that rule, or it
 becomes the only gate that matters.
 
+### Admin access: the escape hatch
+
+Above the profile list is **Admin access (all profiles)** — a single username and
+password that is not attached to any profile. It always works:
+
+* whatever profile is active, including one with viewer credentials;
+* when **no** profile is active, where viewers would otherwise see "This stream
+  is not available";
+* after a profile's own credentials are wrong, deleted, or forgotten.
+
+That is its whole purpose: a mistake in a profile must never lock you out of your
+own site. It appears in chat under its own username.
+
+Two consequences:
+
+* **It is one more way in.** Anyone who knows it can watch regardless of the
+  profile. Use a password you do not hand out.
+* **Changing it signs out anyone using the old one.** That is deliberate, because
+  the usual reason to change it is that it leaked.
+
+Owncast's own `/admin` stays reachable through the gate in any case, so this is a
+convenience for watching, not the only route back in.
+
 ### Revoking access
 
 Changes take effect the next time the viewer loads the page. Owncast checks the

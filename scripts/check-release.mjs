@@ -738,6 +738,68 @@ function checkHostBinaries() {
 }
 
 // ---------------------------------------------------------------------------
+// Sign-in budget
+//
+// The site-wide attempt budget is counted in hash rounds. Two things must stay
+// true or the denial-of-service fix silently stops bounding anything:
+//
+//   * one worst-case attempt fits inside the budget. The realistic worst case is
+//     the active profile plus the owner login, both written before records
+//     carried a count, so both are verified at LEGACY_ROUNDS and ROUNDS.
+//   * the budget is small enough that a queued burst stays well inside the 5 s
+//     handler deadline. 0.3.1 was measured at roughly 1.1 ms per round, so the
+//     ceiling below works out to under 2 s of hashing.
+// ---------------------------------------------------------------------------
+
+const MAX_QUEUED_ROUNDS = 2400;
+
+function readNumberConstant(source, name) {
+  // Only digits, `*` and spaces, so this stays a parse rather than an eval.
+  const match = new RegExp(`const ${name} = ([0-9*\\s]+);`).exec(source);
+  if (!match) return null;
+  return match[1]
+    .split("*")
+    .reduce((total, part) => total * Number(part.trim() || "1"), 1);
+}
+
+function checkSignInBudget() {
+  const relative = "src/plugin.js";
+  const absolute = join(ROOT, relative);
+  if (!existsSync(absolute)) return; // checkRequiredFiles already reported it
+
+  const source = readFileSync(absolute, "utf8");
+  const budget = readNumberConstant(source, "ATTEMPT_ROUNDS");
+  if (!budget) {
+    fail(`${relative}: ATTEMPT_ROUNDS could not be read, so the sign-in budget is unchecked`);
+    return;
+  }
+
+  let auth;
+  try {
+    auth = createRequire(import.meta.url)(join(ROOT, "src", "auth.js"));
+  } catch (error) {
+    return; // checkPasswordHashing already reported the load failure
+  }
+
+  const worstAttempt = 2 * (auth.LEGACY_ROUNDS + auth.ROUNDS);
+  if (budget < worstAttempt) {
+    fail(
+      `${relative}: ATTEMPT_ROUNDS is ${budget}, below the ${worstAttempt} rounds an ` +
+        "unmigrated profile plus owner login costs to verify. Refusing attempts that " +
+        "cannot fit would lock viewers out instead of throttling them.",
+    );
+  }
+
+  if (budget > MAX_QUEUED_ROUNDS) {
+    fail(
+      `${relative}: ATTEMPT_ROUNDS is ${budget}, above the ${MAX_QUEUED_ROUNDS} rounds ` +
+        "measured as survivable. A queued burst would reach the 5 s handler deadline, " +
+        "which closes the plugin runtime instead of slowing it down.",
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -750,6 +812,7 @@ function main() {
   checkInstallScriptPolicy();
   checkHostBinaries();
   checkPasswordHashing();
+  checkSignInBudget();
   checkAssetCacheBusting(version);
   checkTag(args.tag, version);
 

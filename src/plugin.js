@@ -64,15 +64,22 @@ const SESSION_PREFIX = "auth-session:";
 // this returns, so a burst cannot all pass the check while the first hash is
 // still running. The bucket is global because the request carries no trustworthy
 // client address (only headers the caller chooses); a second bucket per submitted
-// username stops one account being ground down. Per-IP limiting belongs at the
-// reverse proxy; this is the ceiling that has to exist where the work happens.
+// username (hashed, so every name is treated alike) keeps one account from being
+// ground down. Per-IP throttling still belongs at the reverse proxy; this is the
+// ceiling that has to exist here, because the plugin is what does the expensive
+// work.
 //
-// The burst is the real bound: at most that many hashes can queue behind each
-// other, a fraction of the 5 s deadline. A successful sign-in refunds its token,
-// so a viewer who types the password correctly never spends the site's budget.
+// The budget is counted in hash rounds, not attempts, because one attempt is not
+// a fixed amount of work: 32 rounds normally, but 544 per credential written by
+// an older release, which has to be verified at both counts until it is upgraded.
+// Counting attempts would let a burst of eight turn into 8 x 1088 rounds, which
+// is past the deadline -- the exact failure this exists to prevent. 0.3.1
+// survived roughly 2400 rounds queued, so half of that leaves room on a slower
+// server. A successful sign-in refunds what it spent, so a viewer who types the
+// password right never spends the site's budget.
 const ATTEMPT_KEY = "auth-attempt";
-const ATTEMPT_BURST = 8;
-const ATTEMPT_REFILL_MS = 10 * 1000;
+const ATTEMPT_ROUNDS = 1600;
+const ATTEMPT_ROUNDS_REFILL_MS = 60 * 1000;
 const ATTEMPT_USER_PREFIX = "auth-attempt-user:";
 const ATTEMPT_USER_BURST = 3;
 const ATTEMPT_USER_REFILL_MS = 60 * 1000;
@@ -1012,21 +1019,7 @@ function authenticate(auth, username, password) {
   // Every salt and round count in force is hashed, whatever username was
   // supplied, so a failed attempt costs the same work whether the name exists
   // or not. The candidate list below only decides which hashes are compared.
-  const work = [];
-  const seenWork = {};
-
-  function addWork(entry) {
-    const counts = roundsToTry(entry);
-    for (let i = 0; i < counts.length; i += 1) {
-      const key = entry.salt + "|" + counts[i];
-      if (seenWork[key]) continue;
-      seenWork[key] = true;
-      work.push({ salt: entry.salt, rounds: counts[i] });
-    }
-  }
-
-  for (let i = 0; i < auth.entries.length; i += 1) addWork(auth.entries[i]);
-  if (auth.admin) addWork(auth.admin);
+  const work = credentialWork(auth);
 
   // Exact username matches are tried before the owner login, which is tried
   // before password-only entries. Both are legitimate candidates, but an entry
@@ -1055,6 +1048,37 @@ function authenticate(auth, username, password) {
   const match = findMatchingCredential(candidates, password, work);
   if (match) persistUpgradedCredential(auth, match);
   return match;
+}
+
+// Every { salt, rounds } the active credential set has to be hashed at, one per
+// distinct pair. Two callers depend on this being the same list: verification
+// hashes it, and the attempt budget is charged for it, so they must not drift.
+function credentialWork(auth) {
+  const work = [];
+  const seen = {};
+
+  function add(entry) {
+    const counts = roundsToTry(entry);
+    for (let i = 0; i < counts.length; i += 1) {
+      const key = entry.salt + "|" + counts[i];
+      if (seen[key]) continue;
+      seen[key] = true;
+      work.push({ salt: entry.salt, rounds: counts[i] });
+    }
+  }
+
+  for (let i = 0; i < auth.entries.length; i += 1) add(auth.entries[i]);
+  if (auth.admin) add(auth.admin);
+  return work;
+}
+
+// What one verification will cost, in rounds, before it runs. Falls back to the
+// cost of the fixed-salt hash performed when there is nothing to check.
+function signInCostRounds(auth) {
+  const work = credentialWork(auth);
+  let rounds = 0;
+  for (let i = 0; i < work.length; i += 1) rounds += work[i].rounds;
+  return rounds > 0 ? rounds : ROUNDS;
 }
 
 // A credential verified at an older count is re-hashed at the current one by
@@ -1337,12 +1361,13 @@ function gateEntry(req) {
       return plainResponse(401, "Invalid credentials.");
     }
     // This branch hashes a password too, so it spends from the same budget.
-    if (!reserveSignInAttempt(credentials.user)) {
+    const cost = signInCostRounds(auth);
+    if (!reserveSignInAttempt(credentials.user, cost)) {
       return plainResponse(429, "Too many sign-in attempts. Wait a moment, then try again.");
     }
     const match = authenticate(auth, credentials.user, credentials.password);
     if (!match) return plainResponse(401, "Invalid credentials.");
-    refundSignInAttempt(credentials.user);
+    refundSignInAttempt(credentials.user, cost);
     try {
       grantAccess(match.admin ? ADMIN_SCOPE : auth.profileId, match.entry);
     } catch (error) {
@@ -1361,8 +1386,10 @@ function gateEntry(req) {
 }
 
 // One attempt's worth of budget. A token bucket rather than a fixed window so a
-// viewer is not locked out for the whole window after one typo.
-function takeToken(key, burst, refillMs) {
+// viewer is not locked out for the whole window after one typo. `cost` is in
+// rounds for the site-wide bucket and 1 for the per-username one; `refillMs` is
+// how long a completely empty bucket takes to refill.
+function takeTokens(key, burst, refillMs, cost) {
   const now = Date.now();
   const stored = parseJson(owncast.kv.get(key));
   let tokens = burst;
@@ -1373,21 +1400,24 @@ function takeToken(key, burst, refillMs) {
     if (typeof stored.at === "number" && isFinite(stored.at)) at = stored.at;
   }
 
-  const refilled = Math.min(burst, tokens + Math.max(0, now - at) / refillMs);
-  const left = refilled >= 1 ? refilled - 1 : refilled;
-  owncast.kv.set(key, JSON.stringify({ tokens: left, at: now }));
-  return refilled >= 1;
+  const refilled = Math.min(burst, tokens + (Math.max(0, now - at) * burst) / refillMs);
+  // A single attempt is always allowed even if it costs more than the bucket
+  // holds: refusing it forever would lock the deployment out, which is the
+  // failure this whole change exists to prevent.
+  const allowed = refilled >= cost;
+  owncast.kv.set(key, JSON.stringify({ tokens: allowed ? refilled - cost : refilled, at: now }));
+  return allowed;
 }
 
-// Returns a token after a successful sign-in, so a viewer who mistyped once
-// does not spend the site's budget.
-function refundToken(key, burst) {
+// Returns what an attempt spent after a successful sign-in, so a viewer who
+// mistyped once does not spend the site's budget.
+function refundTokens(key, burst, cost) {
   const stored = parseJson(owncast.kv.get(key));
   if (!stored || typeof stored !== "object") return;
 
   const tokens = typeof stored.tokens === "number" && isFinite(stored.tokens) ? stored.tokens : 0;
   const at = typeof stored.at === "number" && isFinite(stored.at) ? stored.at : Date.now();
-  owncast.kv.set(key, JSON.stringify({ tokens: Math.min(burst, tokens + 1), at: at }));
+  owncast.kv.set(key, JSON.stringify({ tokens: Math.min(burst, tokens + cost), at: at }));
 }
 
 // Hashed so the KV key is a fixed, safe alphabet whatever the viewer typed.
@@ -1398,16 +1428,19 @@ function usernameAttemptKey(username) {
 // Reserves one attempt across both buckets. The username bucket is checked
 // first, so a name that is already exhausted does not also drain the site-wide
 // budget.
-function reserveSignInAttempt(username) {
-  if (!takeToken(usernameAttemptKey(username), ATTEMPT_USER_BURST, ATTEMPT_USER_REFILL_MS)) {
+function reserveSignInAttempt(username, cost) {
+  if (!takeTokens(usernameAttemptKey(username), ATTEMPT_USER_BURST, ATTEMPT_USER_REFILL_MS, 1)) {
     return false;
   }
-  return takeToken(ATTEMPT_KEY, ATTEMPT_BURST, ATTEMPT_REFILL_MS);
+  // Clamped so a record set too large to ever fit still gets one attempt
+  // through rather than a permanent refusal.
+  const charge = Math.min(cost, ATTEMPT_ROUNDS);
+  return takeTokens(ATTEMPT_KEY, ATTEMPT_ROUNDS, ATTEMPT_ROUNDS_REFILL_MS, charge);
 }
 
-function refundSignInAttempt(username) {
-  refundToken(usernameAttemptKey(username), ATTEMPT_USER_BURST);
-  refundToken(ATTEMPT_KEY, ATTEMPT_BURST);
+function refundSignInAttempt(username, cost) {
+  refundTokens(usernameAttemptKey(username), ATTEMPT_USER_BURST, 1);
+  refundTokens(ATTEMPT_KEY, ATTEMPT_ROUNDS, Math.min(cost, ATTEMPT_ROUNDS));
 }
 
 // 429 rendered with the ordinary sign-in page, so a throttled viewer gets a
@@ -1466,8 +1499,11 @@ function gateLogin(req) {
     );
   }
 
-  // Metered before the hash, because the hash is the cost being abused.
-  if (!reserveSignInAttempt(form.user)) {
+  // Metered before the hash, because the hash is the cost being abused. The
+  // charge is the work this attempt will actually do, which is 32 rounds for a
+  // current record and 544 while an older one is verified at both counts.
+  const cost = signInCostRounds(auth);
+  if (!reserveSignInAttempt(form.user, cost)) {
     return tooManyAttempts(returnTo, auth);
   }
 
@@ -1483,7 +1519,7 @@ function gateLogin(req) {
     );
   }
 
-  refundSignInAttempt(form.user);
+  refundSignInAttempt(form.user, cost);
 
   try {
     grantAccess(match.admin ? ADMIN_SCOPE : auth.profileId, match.entry);

@@ -246,11 +246,15 @@ Owncast's source rather than its docs:
   anything, and an empty credential set still spends one hash against a fixed
   salt. Returning early was a timing oracle that told an unauthenticated caller
   which usernames were real.
-* **Every attempt is budgeted before it hashes.** A token bucket in KV (five per
-  site, three per username) keeps a burst inside the handler deadline. The
-  bucket state is written before the hash starts, so concurrent requests cannot
-  all pass the check while the first one runs. The bucket is not keyed on a
-  client address: the request carries none the caller cannot choose.
+* **Every attempt is budgeted before it hashes.** A token bucket in KV keeps a
+  burst inside the handler deadline. It is counted in hash *rounds*, not
+  attempts, because a record written by an older release costs both counts to
+  verify — budgeting attempts would let a few queued requests turn into several
+  times the deadline, which is the failure being prevented. Three attempts per
+  username, and a site-wide ceiling of `ATTEMPT_ROUNDS` that one attempt always
+  fits inside. The bucket state is written before the hash starts, so concurrent
+  requests cannot all pass the check while the first one runs. It is not keyed on
+  a client address: the request carries none the caller cannot choose.
 * **Sign-in and sign-out are same-origin only.** Email clients, other sites and
   prefetchers must not be able to submit the form or end a session. The primary
   signal is `Sec-Fetch-Site`, which page script cannot forge; `Origin`/`Referer`

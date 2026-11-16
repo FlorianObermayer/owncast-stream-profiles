@@ -22,11 +22,13 @@ Two controls are worth knowing about when you report something:
 
 * **Sign-in attempts are metered.** A password check is the expensive part of a
   request, and the plugin runtime can be left unusable by overrunning its
-  handler deadline. Failed attempts therefore spend from a token bucket before
-  any hashing happens: eight per site and three per username, refilling over ten
-  seconds and a minute respectively. A burst gets HTTP 429 rather than queueing
-  up. Per-client limiting still belongs at your reverse proxy — the plugin
-  request carries no trustworthy client address.
+  handler deadline. Failed attempts therefore spend from a shared budget before
+  any hashing happens, and the budget is measured in hashing work, not in
+  attempts — one attempt costs very little on a normal record and roughly
+  seventeen times that while a record written by an older release is being
+  migrated. A burst is answered with HTTP 429 rather than queued. Per-client
+  limiting still belongs at your reverse proxy: the plugin request carries no
+  trustworthy client address.
 * **Sign-in and sign-out check where the request came from.** A request whose
   browser metadata marks it as cross-site is refused, and sign-out is a POST
   with a confirmation page. Scripted clients that send no browser headers keep

@@ -146,6 +146,29 @@ Adding a **permission** is user-visible: every installed copy shows "needs
 re-approval" until an admin approves. Update `EXPECTED_PERMISSIONS` in
 `scripts/check-release.mjs` in the same commit.
 
+## AI security scan
+
+`.github/workflows/strix.yml` runs the [strix](https://github.com/usestrix/strix)
+scanner weekly and on demand. The gotchas, since none of them are obvious:
+
+* **It never runs on a pull request.** GitHub withholds secrets from fork pull
+  requests, so it would fail on a missing key; `pull_request_target` would fix
+  that by handing the key to untrusted code. Use `workflow_dispatch` on a branch.
+* **The LLM endpoint must be reachable from a GitHub runner.** A LiteLLM proxy
+  on your LAN is not. Either expose it or use a self-hosted runner.
+* **Set the price variables or `--max-budget` does nothing.** A gateway model id
+  is not in LiteLLM's catalogue, so the cost reports as 0 and the cap never
+  trips. `STRIX_LLM`/`LLM_API_BASE` and the two `*_USD_PER_MTOK` values are
+  repository variables; only `LLM_API_KEY` is a secret.
+* **Findings are reported, not enforced.** An LLM scanner is not deterministic,
+  so a required check would go red at random. Add `--fail-on high` if you want
+  a gate anyway.
+* **It only sees source.** The high-value findings in the 2026-11 report came
+  from attacking the deployed instance with real credentials. Run that by hand
+  when the gate changes; CI cannot.
+* **Keep `strix_runs/` out of commits** — it is already in `.gitignore`, and CI
+  uploads it as the `strix-run` artifact instead.
+
 ## Publishing to the catalog
 
 Optional, and manual. Every Owncast install's **Browse** tab reads

@@ -1,21 +1,3 @@
-# AI penetration test of the source: weekly, and on demand.
-#
-# Deliberately not triggered by `pull_request`. GitHub withholds secrets from a
-# workflow started by a fork's pull request, so that run would spend a job
-# failing on a missing key. `pull_request_target` would make the key available
-# and would then run untrusted fork code with it, which is the one mistake this
-# repository avoids everywhere else.
-#
-# Findings do not fail the job. The scanner is an LLM, so the same commit can
-# yield different findings on consecutive runs; making that a required check
-# would block merges at random. The exit code is reported either way, and
-# `--fail-on high` in the scan step is the switch if a gate is ever wanted.
-#
-# What it cannot do: the useful half of the original report came from attacking
-# a live deployment with real credentials. CI has only the source, so this finds
-# code-level problems and no dynamic ones. Keep running the full scan by hand
-# against the deployment when the gate changes.
-
 name: AI security scan
 
 on:
@@ -44,8 +26,6 @@ jobs:
   scan:
     name: Strix
     runs-on: ubuntu-latest
-    # Generous: a quick run takes minutes, a deep one took ~80 minutes when it
-    # was run by hand. The budget, not this timeout, is the real cost control.
     timeout-minutes: 90
     permissions:
       contents: read
@@ -55,12 +35,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # Diff scoping compares against a merge base, which needs history.
           fetch-depth: 0
 
-      # Pinned, not `curl https://strix.ai/install | bash`. Every executable
-      # this repository runs is pinned (see scripts/check-release.mjs), and the
-      # installer fetches a rotating binary — it would be the one exception.
       - name: Install Strix
         run: |
           python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)' || {
@@ -73,30 +49,20 @@ jobs:
 
       - name: Run the scan
         env:
-          # Not credentials, so a repository variable rather than a secret.
           STRIX_LLM: ${{ vars.STRIX_LLM }}
-          LLM_API_BASE: ${{ vars.LLM_API_BASE }}
-          # The LiteLLM virtual key.
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          # A gateway model id is not in LiteLLM's price catalogue, so without
-          # these the reported cost is 0 and --max-budget never trips.
-          STRIX_LLM_INPUT_COST_PER_MTOK: ${{ vars.STRIX_INPUT_USD_PER_MTOK }}
-          STRIX_LLM_OUTPUT_COST_PER_MTOK: ${{ vars.STRIX_OUTPUT_USD_PER_MTOK }}
-          # A custom LLM_API_BASE does not change which OpenAI path is used, and
-          # a gateway typically serves chat completions only. Without this the
-          # model catalog can pick /v1/responses, which the gateway answers 404.
-          STRIX_API_TYPE: chat_completions
-          # Off: a third-party scanner phoning home from a repository this
-          # careful about what it executes is not worth the convenience.
+          # Optional: only needed for a gateway or a non-default endpoint.
+          LLM_API_BASE: ${{ vars.LLM_API_BASE }}
           STRIX_TELEMETRY: "0"
         run: |
           if [ -z "${LLM_API_KEY}" ] || [ -z "${STRIX_LLM}" ]; then
-            echo "::error::Set the STRIX_LLM variable and the LLM_API_KEY secret." >&2
+            echo "::error::Set the LLM_API_KEY secret and the STRIX_LLM variable." >&2
             exit 1
           fi
+          [ -n "${LLM_API_BASE}" ] || unset LLM_API_BASE
+          echo "Model: ${STRIX_LLM}" >> "$GITHUB_STEP_SUMMARY"
 
-          # Exit 0 = nothing found, 2 = findings, 1 = could not run. Only the
-          # last is a failure of this workflow; findings are the product.
+          # 0 = no findings, 2 = findings, 1 = error. Only an error fails the job.
           set +e
           strix -n \
             --target . \
@@ -108,7 +74,7 @@ jobs:
 
           echo "strix exited ${code}" >> "$GITHUB_STEP_SUMMARY"
           if [ "${code}" -eq 1 ]; then
-            echo "::error::Strix could not complete. Check the key, the gateway URL and the model id." >&2
+            echo "::error::Strix could not complete. Check the key, the model id and the endpoint." >&2
             exit 1
           fi
 

@@ -149,25 +149,23 @@ re-approval" until an admin approves. Update `EXPECTED_PERMISSIONS` in
 ## AI security scan
 
 `.github/workflows/strix.yml` runs the [strix](https://github.com/usestrix/strix)
-scanner weekly and on demand. The gotchas, since none of them are obvious:
+scanner weekly and on demand. It is provider-agnostic: set the `STRIX_LLM`
+variable to any LiteLLM model id and the `LLM_API_KEY` secret to that provider's
+key; `LLM_API_BASE` is optional for a gateway. The gotchas:
 
-* **It never runs on a pull request.** GitHub withholds secrets from fork pull
-  requests, so it would fail on a missing key; `pull_request_target` would fix
-  that by handing the key to untrusted code. Use `workflow_dispatch` on a branch.
-* **The LLM endpoint must be reachable from a GitHub runner.** A LiteLLM proxy
-  on your LAN is not. Either expose it or use a self-hosted runner.
-* **Set the price variables or `--max-budget` does nothing.** A gateway model id
-  is not in LiteLLM's catalogue, so the cost reports as 0 and the cap never
-  trips. `STRIX_LLM`/`LLM_API_BASE` and the two `*_USD_PER_MTOK` values are
-  repository variables; only `LLM_API_KEY` is a secret.
-* **Findings are reported, not enforced.** An LLM scanner is not deterministic,
-  so a required check would go red at random. Add `--fail-on high` if you want
-  a gate anyway.
-* **It only sees source.** The high-value findings in the 2026-11 report came
-  from attacking the deployed instance with real credentials. Run that by hand
-  when the gate changes; CI cannot.
-* **Keep `strix_runs/` out of commits** — it is already in `.gitignore`, and CI
-  uploads it as the `strix-run` artifact instead.
+* **Not on pull requests.** Fork PRs get no secrets, and `pull_request_target`
+  would hand the key to untrusted code. Scan a branch with `workflow_dispatch`.
+* **Never a self-hosted runner** while this repository is public: a fork can edit
+  a workflow file and have that job run on your machine.
+* **The endpoint must be reachable from GitHub**, so not a LAN-only gateway. A
+  gateway model alias also isn't in LiteLLM's price catalogue, so cost reports as
+  `0` and `--max-budget` never trips; set `STRIX_LLM_*_COST_PER_MTOK` if you use one.
+* **Findings don't fail the job** — an LLM scanner isn't deterministic. Add
+  `--fail-on high` for a gate.
+* **It only sees source.** The 2026-11 report's best findings came from attacking
+  the deployment with real credentials; do that by hand.
+* **`strix_runs/` stays out of commits**; CI uploads it as the `strix-run`
+  artifact.
 
 ## Publishing to the catalog
 

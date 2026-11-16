@@ -92,6 +92,15 @@ their access.
 To end a session on this device, visit
 `/plugins/stream-profiles/auth/logout`.
 
+## If the site stops loading
+
+The plugin answers every visitor, so if it stops responding the site looks down
+for everyone. Reload it: **Plugins → Stream Profiles → Reload**. That fixes it
+without restarting Owncast, and the sign-in is unchanged.
+
+Prefer **Reload** over **Disable**: disabling switches the sign-in off entirely
+and leaves the site public.
+
 ## Notes
 
 * **Suggested chat usernames** let each profile supply the list of names Owncast

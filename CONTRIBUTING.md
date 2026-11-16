@@ -206,11 +206,18 @@ Owncast's source rather than its docs:
   (`plugins.DefaultSessionTTL`). Returning `authCheck.refresh({ ttl })` on a
   valid page load makes it sliding, which is why `onAuthCheck` refreshes rather
   than merely accepts.
-* **The round count in `src/auth.js` is measured, not chosen for taste.** SHA-256
-  costs about 1.5 ms per round on the embedded interpreter, so `ROUNDS = 512` is
-  roughly 0.75 s per check against a 5 s handler budget. 4096 was measured to
-  time out. Salting stops a leaked digest being a direct lookup; the iteration
-  count is a speed bump, not a KDF, so password strength still matters.
+* **Exceeding the handler timeout does not produce a slow response, it kills the
+  plugin.** The engine is compiled with wazero's `CloseOnContextDone`, so a call
+  that overruns its 5 s context closes the wasm module; every later call fails
+  with `module is closed`, `isWasmCorrupted` does not match that string, and
+  nothing reloads it. The site stays down until an admin presses **Reload** on
+  the plugin. Budget every handler as if overrunning were fatal, because it is.
+* **The round count in `src/auth.js` follows from that.** It is 32, about 50 ms
+  per check on the embedded interpreter. 512 rounds (~0.8 s here, and plausibly
+  over the budget on a small server) shipped in `0.3.0` and took a site down with
+  exactly the failure above. Salting stops a leaked digest being a direct
+  lookup; the iteration count is a speed bump, not a KDF, so password strength
+  still matters.
 * **A shared salt makes identical passwords identical hashes**, so matching must
   prefer an entry that names the viewer over a password-only one. `0.1.1` did
   not, and a password-only entry added earlier silently stood in for a named

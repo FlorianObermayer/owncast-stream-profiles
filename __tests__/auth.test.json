@@ -64,7 +64,7 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -89,7 +89,7 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -121,7 +121,7 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -162,7 +162,7 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -192,7 +192,7 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -220,7 +220,7 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c2\",\"user\":\"\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth:a": "[{\"id\":\"c2\",\"user\":\"\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -258,7 +258,7 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -292,7 +292,7 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -320,7 +320,7 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -348,7 +348,7 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]",
         "auth-session:u-a:c1": "a|c1"
       }
     },
@@ -372,8 +372,8 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"},{\"id\":\"b\",\"name\":\"B\"}]",
         "active-profile": "b",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
-        "auth:b": "[{\"id\":\"c9\",\"user\":\"carol\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"75d0519fc852bbb89a70d6af155d68ad648f6374789d04a76aeada0a9599c283\"}]",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]",
+        "auth:b": "[{\"id\":\"c9\",\"user\":\"carol\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"446dccdb3146d530381d5e443b89de8ef7533cbad346c88f3b5e53c5134ccf46\"}]",
         "auth-session:u-a:c1": "a|c1"
       }
     },
@@ -397,7 +397,7 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]",
         "auth-session:u-a:gone": "a|gone"
       }
     },
@@ -443,7 +443,7 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -492,7 +492,7 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -519,7 +519,7 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -546,7 +546,7 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"},{\"id\":\"c2\",\"user\":\"huhu\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"},{\"id\":\"c2\",\"user\":\"huhu\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -583,7 +583,7 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"},{\"id\":\"c2\",\"user\":\"huhu\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"},{\"id\":\"c2\",\"user\":\"huhu\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -621,7 +621,7 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"},{\"id\":\"c2\",\"user\":\"huhu\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"},{\"id\":\"c2\",\"user\":\"huhu\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -659,8 +659,8 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
-        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]",
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -697,7 +697,7 @@
     "given": {
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
-        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -751,7 +751,7 @@
     "given": {
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
-        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -773,8 +773,8 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
-        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]",
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -806,7 +806,7 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -840,8 +840,8 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"},{\"id\":\"b\",\"name\":\"B\"}]",
         "active-profile": "b",
-        "auth:b": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
-        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
+        "auth:b": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]",
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]",
         "auth-session:u-admin:admin-1": "admin|admin-1"
       }
     },
@@ -864,7 +864,7 @@
     "given": {
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
-        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]",
         "auth-session:u-admin:admin-1": "admin|admin-1"
       }
     },
@@ -888,8 +888,8 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
-        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]",
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]",
         "auth-session:u-admin:old": "admin|admin-0"
       }
     },
@@ -913,8 +913,8 @@
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]",
-        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]",
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -966,7 +966,7 @@
     "given": {
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
-        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [
@@ -1013,7 +1013,7 @@
     "given": {
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
-        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"347a985ec7168356313c41db6be8a43bbf49dc635408e87dc538020b81310acf\"}]"
+        "auth-admin": "[{\"id\":\"admin-1\",\"user\":\"owner\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]"
       }
     },
     "events": [

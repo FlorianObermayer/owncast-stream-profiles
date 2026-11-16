@@ -1,6 +1,6 @@
 {
   "name": "owncast-stream-profiles",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
   "description": "Owncast plugin: switch between named sets of stream copy, branding, discoverability, chat policy and advanced settings.",
   "license": "MIT",

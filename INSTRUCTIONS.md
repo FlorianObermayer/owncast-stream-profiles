@@ -90,7 +90,13 @@ watching keeps watching until they reload. Removing the credential is what ends
 their access.
 
 To end a session on this device, visit
-`/plugins/stream-profiles/auth/logout`.
+`/plugins/stream-profiles/auth/logout` and confirm. Signing out clears the session
+in that browser; it does not change the password, so if the device may have been
+shared, change the credential instead.
+
+Repeated wrong passwords pause sign-in for a moment — the page says so. That
+pause is what keeps a guessing spree from taking the whole site down for
+everyone, so do not treat it as a fault.
 
 ## If the site stops loading
 

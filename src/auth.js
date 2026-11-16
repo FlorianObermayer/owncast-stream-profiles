@@ -246,9 +246,26 @@ function sha256Hex(value) {
 // lookup thanks to the salt, and password strength still matters.
 const ROUNDS = 32;
 
-function hashPassword(password, salt) {
+// A digest only matches the round count that produced it, and the count cannot
+// be recovered from a digest. 0.3.0 hashed 512 times and wrote records with no
+// count field; 0.3.1 hashed 32 times and wrote the same shape. So an unlabelled
+// record has to be tried at both counts, current first, and every record written
+// from now on must carry the count it was hashed at. Changing ROUNDS without
+// that was a silent, fleet-wide lockout in 0.3.1: every stored password and the
+// profile-independent owner login stopped verifying.
+const LEGACY_ROUNDS = 512;
+
+function roundsToTry(entry) {
+  const stored = entry && entry.rounds;
+  if (typeof stored === "number" && stored > 0) return [stored];
+  if (ROUNDS === LEGACY_ROUNDS) return [ROUNDS];
+  return [ROUNDS, LEGACY_ROUNDS];
+}
+
+function hashPassword(password, salt, rounds) {
+  const count = typeof rounds === "number" && rounds > 0 ? rounds : ROUNDS;
   let digest = sha256Bytes(utf8Bytes(salt + ":" + String(password)));
-  for (let i = 1; i < ROUNDS; i += 1) {
+  for (let i = 1; i < count; i += 1) {
     digest = sha256Bytes(digest);
   }
   return bytesToHex(digest);
@@ -309,7 +326,21 @@ function normalizeCredentials(input) {
     if (!id || !salt || !hash || seen[id]) continue;
 
     seen[id] = true;
-    out.push({ id: id, user: text(candidate.user).trim(), salt: salt, hash: hash });
+    // Keep the round count beside the digest. A record without one is left
+    // without one rather than defaulted: an unlabelled record may have been
+    // written by either release, and inventing a count here would make it
+    // permanently unverifiable.
+    const record = {
+      id: id,
+      user: text(candidate.user).trim(),
+      salt: salt,
+      hash: hash,
+    };
+    const rounds = candidate.rounds;
+    if (typeof rounds === "number" && isFinite(rounds) && rounds > 0 && rounds <= 4096) {
+      record.rounds = Math.floor(rounds);
+    }
+    out.push(record);
   }
 
   return out;
@@ -335,39 +366,55 @@ function summarizeCredentials(entries) {
   });
 }
 
-function findMatchingCredential(entries, username, password) {
+// Salt for the constant-cost case below. Its value is irrelevant: no credential
+// is ever stored against it. It exists so a lookup with nothing to check still
+// does the same work as one that had a candidate.
+const FAILURE_SALT = "stream-profiles-no-matching-credential";
+
+// `candidates` are { entry, admin } pairs in precedence order. `work` is every
+// { salt, rounds } pair in the active credential set, and it is hashed whether
+// or not a candidate matches, so a failed attempt costs the same number of
+// hashes for an unknown username as for a known one. Returning before hashing
+// was the username oracle: an unknown name answered in ~0 ms against ~40 ms.
+//
+// One digest per distinct (salt, rounds), not per entry: every credential in a
+// profile shares one salt, so ten entries still cost one hash. Without that,
+// hashing per entry would put a realistic profile past the host's 5 s budget.
+function findMatchingCredential(candidates, password, work) {
   const given = text(password);
   if (given === "") return null;
 
-  const supplied = text(username);
-
-  // Exact username matches are tried before password-only entries. Both are
-  // legitimate candidates, but an entry that names the viewer must win. Because
-  // a profile shares one salt, two entries with the same password have
-  // identical hashes, so without this ordering an earlier password-only entry
-  // would silently stand in and the viewer would appear in chat as "Guest"
-  // instead of their username.
-  const named = [];
-  const wildcard = [];
-
-  for (let i = 0; i < entries.length; i += 1) {
-    const entry = entries[i];
-    if (entry.user === "") wildcard.push(entry);
-    else if (entry.user === supplied) named.push(entry);
+  const digests = {};
+  for (let i = 0; i < work.length; i += 1) {
+    const job = work[i];
+    const key = job.salt + "|" + job.rounds;
+    if (!digests[key]) digests[key] = hashPassword(given, job.salt, job.rounds);
   }
 
-  const candidates = named.concat(wildcard);
-  if (!candidates.length) return null;
+  // No credential at all: still spend one hash so the empty set is not a fast
+  // path an attacker can detect.
+  if (!work.length) hashPassword(given, FAILURE_SALT);
 
-  // One digest per distinct salt, not per entry. Every credential in a profile
-  // shares a salt, so a profile with ten entries still costs a single hash: at
-  // roughly 1.5 ms per round in the sandbox, hashing per entry would put a
-  // realistic profile past the host's 5 s handler budget.
-  const digests = {};
   for (let i = 0; i < candidates.length; i += 1) {
-    const entry = candidates[i];
-    if (!digests[entry.salt]) digests[entry.salt] = hashPassword(given, entry.salt);
-    if (timingSafeEqual(digests[entry.salt], entry.hash)) return entry;
+    const candidate = candidates[i];
+    const entry = candidate.entry;
+    const counts = roundsToTry(entry);
+    for (let c = 0; c < counts.length; c += 1) {
+      const rounds = counts[c];
+      const key = entry.salt + "|" + rounds;
+      const digest = digests[key] || hashPassword(given, entry.salt, rounds);
+      if (!timingSafeEqual(digest, entry.hash)) continue;
+
+      // A digest verified at an older count is re-hashed at the current one
+      // while the password is in hand, so the legacy count is not paid on every
+      // later attempt. The caller writes the record back after granting access.
+      if (entry.rounds !== ROUNDS) {
+        entry.rounds = ROUNDS;
+        entry.hash = hashPassword(given, entry.salt, ROUNDS);
+        entry.upgraded = true;
+      }
+      return candidate;
+    }
   }
 
   return null;
@@ -397,12 +444,19 @@ function parseBasicAuthorization(header) {
 // refused. `//host` and `/\host` are both protocol-relative in a browser.
 function safeReturnTo(value) {
   const raw = text(value).trim();
+  // A URL parser removes ASCII tab and newline characters before it resolves a
+  // reference, and treats "\\" as "/" for special schemes, so "/<TAB>/host"
+  // resolves to "//host" even though index 1 is not "/". Refuse the whole C0
+  // range and DEL anywhere in the value.
+  if (/[\u0000-\u001f\u007f]/.test(raw)) return "/";
   if (raw === "" || raw.charAt(0) !== "/") return "/";
   if (raw.charAt(1) === "/" || raw.charAt(1) === "\\") return "/";
   return raw;
 }
 
 module.exports = {
+  LEGACY_ROUNDS,
+  ROUNDS,
   base64,
   bytesToHex,
   hashPassword,
@@ -410,6 +464,7 @@ module.exports = {
   normalizeCredentials,
   parseBasicAuthorization,
   safeReturnTo,
+  roundsToTry,
   sha256Hex,
   summarizeCredentials,
   findMatchingCredential,

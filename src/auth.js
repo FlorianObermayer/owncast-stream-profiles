@@ -229,14 +229,22 @@ function sha256Hex(value) {
 // Password hashing
 // ---------------------------------------------------------------------------
 
-// Chained SHA-256: cheap enough for the embedded interpreter, slow enough that
-// a leaked digest is not a lookup away. Each round rehashes the previous digest,
-// so the cost is linear in ROUNDS and independent of password length.
+// Chained SHA-256, with the round count kept deliberately small.
 //
-// The number is measured, not guessed. One hash costs roughly 0.5 ms on the
-// embedded interpreter, so 1024 rounds is about half a second: comfortable
-// inside the host's 5 s handler budget, and 4096 was measured to time out.
-const ROUNDS = 512;
+// The host's HTTP deadline is 5 s, and exceeding it is not a slow request: the
+// engine is compiled with wazero's CloseOnContextDone, so a call that overruns
+// its context *closes the wasm module*. Every later call then fails with
+// "module is closed", which the host's corruption detector does not recognise,
+// so nothing reloads the plugin and the whole site stays down until an admin
+// reloads it by hand. A 512-round chain cost about 0.8 s on a fast machine and
+// could plausibly overrun that budget on a small server, which is exactly the
+// failure that took a site down.
+//
+// So the chain is a speed bump with a wide margin, not a KDF: 32 rounds is
+// roughly 50 ms locally, leaving the budget for the rest of the request even
+// if the server is several times slower. A leaked digest is still not a direct
+// lookup thanks to the salt, and password strength still matters.
+const ROUNDS = 32;
 
 function hashPassword(password, salt) {
   let digest = sha256Bytes(utf8Bytes(salt + ":" + String(password)));

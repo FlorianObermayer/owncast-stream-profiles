@@ -103,7 +103,7 @@ jobs:
           fi
 
       - name: Upload findings to code scanning
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && hashFiles('strix_runs/**/*.sarif') != ''
         # A malformed SARIF from an LLM scanner must not be what blocks a merge.
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@9418214df1f2c4b8128c770156c409013b07d6b9 # v3.39.3

@@ -149,19 +149,23 @@ re-approval" until an admin approves. Update `EXPECTED_PERMISSIONS` in
 ## AI security scan
 
 `.github/workflows/strix.yml` runs the [strix](https://github.com/usestrix/strix)
-scanner weekly and on demand. It is provider-agnostic: set the `STRIX_LLM`
-variable to any LiteLLM model id and the `LLM_API_KEY` secret to that provider's
-key; `LLM_API_BASE` is optional for a gateway. The gotchas:
+scanner on every pull request (diff-scoped), weekly, and on demand. It is
+provider-agnostic: set the `STRIX_LLM` variable to any LiteLLM model id and the
+`LLM_API_KEY` secret to that provider's key; `LLM_API_BASE` is optional. The
+gotchas:
 
-* **Not on pull requests.** Fork PRs get no secrets, and `pull_request_target`
-  would hand the key to untrusted code. Scan a branch with `workflow_dispatch`.
+* **Pull requests are scanned only when the branch is in this repository.** A
+  fork's PR gets no secrets, so the job is skipped rather than left red. That
+  guard also matters because the scan reads `.github/strix-instruction.md` from
+  the PR's own checkout.
 * **Never a self-hosted runner** while this repository is public: a fork can edit
   a workflow file and have that job run on your machine.
 * **The endpoint must be reachable from GitHub**, so not a LAN-only gateway. A
   gateway model alias also isn't in LiteLLM's price catalogue, so cost reports as
   `0` and `--max-budget` never trips; set `STRIX_LLM_*_COST_PER_MTOK` if you use one.
-* **Findings don't fail the job** — an LLM scanner isn't deterministic. Add
-  `--fail-on high` for a gate.
+* **Findings never fail the job**, including the SARIF upload: an LLM scanner
+  isn't deterministic, so gate on it only deliberately, with `--fail-on high`.
+  Findings land in the **Security → Code scanning** tab instead.
 * **It only sees source.** The 2026-11 report's best findings came from attacking
   the deployment with real credentials; do that by hand.
 * **`strix_runs/` stays out of commits**; CI uploads it as the `strix-run`

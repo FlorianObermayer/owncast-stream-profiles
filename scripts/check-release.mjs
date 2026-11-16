@@ -11,6 +11,7 @@
 // that pulls in its own dependency tree is not a check you can trust, and CI
 // runs this before it trusts anything else.
 
+import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
@@ -317,6 +318,47 @@ function checkWorkflowsPinned() {
   }
 }
 
+// `allowScripts` in package.json is only read by npm 11 and later, and even
+// there it only warns unless strict mode is on. The build job therefore has to
+// install a newer npm and set NPM_CONFIG_STRICT_ALLOW_SCRIPTS, or the allowlist
+// silently protects nothing in the very job that builds the attested artifact.
+function checkInstallScriptPolicy() {
+  const relative = ".github/actions/verify/action.yml";
+  const absolute = join(ROOT, relative);
+  if (!existsSync(absolute)) return; // checkRequiredFiles already reported it
+
+  const text = readFileSync(absolute, "utf8");
+  const pkg = readJson("package.json");
+  const policy = pkg && pkg.allowScripts;
+
+  if (!policy || typeof policy !== "object" || !Object.keys(policy).length) {
+    fail("package.json declares no allowScripts allowlist; install scripts run unreviewed");
+    return;
+  }
+
+  const badRange = Object.keys(policy).find((key) => /[\^~<>=*]/.test(key));
+  if (badRange) {
+    fail(
+      `package.json allowScripts entry "${badRange}" is a range; ` +
+        "pin the exact version so a new install script cannot arrive unreviewed",
+    );
+  }
+
+  if (!/NPM_CONFIG_STRICT_ALLOW_SCRIPTS=true/.test(text)) {
+    fail(
+      `${relative} does not set NPM_CONFIG_STRICT_ALLOW_SCRIPTS=true. ` +
+        "Without it an unlisted install script only warns, so the allowlist does not block anything.",
+    );
+  }
+
+  if (!/npm install --global npm@11\./.test(text)) {
+    fail(
+      `${relative} does not install npm 11, which is the first npm that reads ` +
+        "package.json's allowScripts field. Node 22 bundles npm 10, which ignores it.",
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Built package
 // ---------------------------------------------------------------------------
@@ -508,6 +550,98 @@ function checkPasswordHashing() {
   if (auth.hashPassword(password, "salt-one") === auth.hashPassword(password, "salt-two")) {
     fail("src/auth.js hashes ignore the salt");
   }
+
+  // The round count is part of the stored verifier. A record written at the
+  // legacy count must still verify, be upgraded, and be marked so the caller
+  // can persist it; an explicit count must be authoritative.
+  const salt = "0123456789abcdef0123456789abcdef";
+  const legacy = {
+    id: "legacy",
+    user: "alice",
+    salt: salt,
+    hash: auth.hashPassword(password, salt, auth.LEGACY_ROUNDS),
+  };
+  const legacyWork = auth.roundsToTry(legacy).map((rounds) => ({ salt: salt, rounds: rounds }));
+  if (!auth.findMatchingCredential([{ entry: legacy, admin: false }], password, legacyWork)) {
+    fail("a credential written at LEGACY_ROUNDS no longer verifies");
+  } else if (legacy.rounds !== auth.ROUNDS || legacy.upgraded !== true) {
+    fail("a legacy credential verified but was not upgraded to the current round count");
+  }
+
+  const current = {
+    id: "current",
+    user: "bob",
+    salt: salt,
+    hash: auth.hashPassword(password, salt),
+    rounds: auth.ROUNDS,
+  };
+  const currentWork = auth.roundsToTry(current).map((rounds) => ({ salt: salt, rounds: rounds }));
+  if (!auth.findMatchingCredential([{ entry: current, admin: false }], password, currentWork)) {
+    fail("a credential at the current round count does not verify");
+  }
+
+  // 0.3.1 wrote records at the current count with no label. Treating an
+  // unlabelled record as legacy-only would reject every credential created on
+  // 0.3.1, which is the regression this migration exists to prevent.
+  const unlabelled = {
+    id: "unlabelled",
+    user: "carol",
+    salt: salt,
+    hash: auth.hashPassword(password, salt),
+  };
+  const unlabelledWork = auth.roundsToTry(unlabelled).map((rounds) => ({
+    salt: salt,
+    rounds: rounds,
+  }));
+  if (!auth.findMatchingCredential([{ entry: unlabelled, admin: false }], password, unlabelledWork)) {
+    fail("an unlabelled credential at the current round count does not verify");
+  }
+
+  // A stored count is authoritative: a legacy digest labelled as current must
+  // not be accepted by hashing it at the cheaper count.
+  const mislabelled = {
+    id: "mislabelled",
+    user: "dave",
+    salt: salt,
+    hash: auth.hashPassword(password, salt, auth.LEGACY_ROUNDS),
+    rounds: auth.ROUNDS,
+  };
+  const mislabelledWork = auth.roundsToTry(mislabelled).map((rounds) => ({
+    salt: salt,
+    rounds: rounds,
+  }));
+  if (
+    auth.findMatchingCredential([{ entry: mislabelled, admin: false }], password, mislabelledWork)
+  ) {
+    fail("a credential labelled with the wrong round count was accepted");
+  }
+
+  // normalizeCredentials must keep a valid count and drop an absurd one.
+  const preserved = auth.normalizeCredentials(
+    JSON.stringify([{ id: "r1", user: "x", salt: salt, hash: "h", rounds: auth.ROUNDS }]),
+  );
+  if (!preserved.length || preserved[0].rounds !== auth.ROUNDS) {
+    fail("normalizeCredentials drops a valid round count");
+  }
+  const absurd = auth.normalizeCredentials(
+    JSON.stringify([{ id: "r2", user: "x", salt: salt, hash: "h", rounds: 99999 }]),
+  );
+  if (absurd.length && absurd[0].rounds !== undefined) {
+    fail("normalizeCredentials trusts an out-of-range round count");
+  }
+
+  // A URL parser strips C0 controls before resolving a reference, so these all
+  // become "//example.com" in a browser. Legitimate paths must still pass.
+  ["/\t/example.com", "/\n/example.com", "/\r/example.com", "/\u0000/example.com", "/\u007f/example.com"].forEach(
+    (payload) => {
+      if (auth.safeReturnTo(payload) !== "/") {
+        fail("safeReturnTo accepts a control character that can redirect off-site");
+      }
+    },
+  );
+  if (auth.safeReturnTo("/plugins/x?y=z") !== "/plugins/x?y=z") {
+    fail("safeReturnTo rejects a legitimate same-origin path");
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -554,6 +688,56 @@ function checkAssetCacheBusting(manifestVersion) {
 }
 
 // ---------------------------------------------------------------------------
+// Host binaries
+//
+// `npm test` and `npm run package` execute owncast-plugin-test, a native binary
+// the SDK's postinstall downloads from a GitHub release asset. That download has
+// no digest, signature or attestation, and the binary runs with the runner's
+// full privileges *before* the .ocpkg is built, hashed and attested. It could
+// therefore rewrite the bundle, the manifest or the sources that are packaged
+// next, and the published checksums and provenance would still verify.
+//
+// Pinning the digest turns "trust whatever the release asset served today" into
+// a value that changes only through a reviewable diff, the same way the tag pin
+// in .github/actions/verify/action.yml does. Confirm a bump against the upstream
+// release before changing this value.
+// ---------------------------------------------------------------------------
+
+// sha256 of node_modules/@owncast/plugin-sdk/bin/.cache/owncast-plugin-test for
+// host-binary version v0.11.1 (the tag pinned in the verify action).
+const HOST_BINARY_SHA256 =
+  "c75c8fdf642c0c402748723d9e7549025b3e2ee2eac146e4523af1b1f668d4f7";
+
+function checkHostBinaries() {
+  if (process.platform !== "linux" || process.arch !== "x64") {
+    notes.push("host binary digest is pinned for linux-x86_64 only; not checked on this platform");
+    return;
+  }
+
+  const binary = join(
+    ROOT,
+    "node_modules",
+    "@owncast",
+    "plugin-sdk",
+    "bin",
+    ".cache",
+    "owncast-plugin-test",
+  );
+  // Nothing has been downloaded yet, so nothing is about to run. `npm test`
+  // and `npm run package` both refuse to proceed without it.
+  if (!existsSync(binary)) return;
+
+  const actual = createHash("sha256").update(readFileSync(binary)).digest("hex");
+  if (actual !== HOST_BINARY_SHA256) {
+    fail(
+      "the downloaded owncast-plugin-test binary does not match the pinned digest " +
+        `(expected ${HOST_BINARY_SHA256}, found ${actual}). ` +
+        "It runs before the plugin is packaged, so the build stops here.",
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -563,6 +747,8 @@ function main() {
   checkRequiredFiles();
   checkInstructionsLinks();
   checkWorkflowsPinned();
+  checkInstallScriptPolicy();
+  checkHostBinaries();
   checkPasswordHashing();
   checkAssetCacheBusting(version);
   checkTag(args.tag, version);

@@ -17,6 +17,12 @@ plugin through. `npm ci` downloads that binary from the `owncast/plugin-sdk`
 releases; `OWNCAST_PLUGIN_HOST_BINARIES_VERSION` pins the tag and is already set
 in CI.
 
+Use npm 11 or newer locally. `package.json` declares an `allowScripts` allowlist
+and CI installs with `NPM_CONFIG_STRICT_ALLOW_SCRIPTS=true`, so an install script
+missing from that list fails the build rather than running unreviewed. Adding a
+dependency that needs one means adding its exact version there in the same
+commit.
+
 ## Layout
 
 | Path | What it is |
@@ -76,9 +82,11 @@ Two details specific to this plugin:
 * The **admin password goes in the request body**, never `given.config`: pass
   `{"password": "..."}` on apply and server calls.
 * Gateway scenarios seed credentials under `auth:<profileId>` in `given.kv`. The
-  stored hash depends on `ROUNDS` in `src/auth.js`, so changing it means
-  regenerating those fixtures — the failure looks like "wrong password", not
-  like a hashing change.
+  stored hash depends on `ROUNDS` in `src/auth.js`. A record carrying an explicit
+  `rounds` field is verified only at that count, so add `"rounds": 32` to new
+  fixtures; a record without one is tried at both the current and the legacy
+  count and is upgraded on sign-in. `__tests__/auth-security.test.json` pins the
+  redirect, attempt-budget, cross-origin, sign-out and migration behaviour.
 
 `npm run serve` (`PORT=8765` to change) adds dev-only endpoints for handlers HTTP
 cannot reach: `POST /_dev/chat`, `GET /_dev/chat`, `POST /_dev/event`. Restart it
@@ -134,8 +142,9 @@ one is superseded by the next version, never moved.
 
 `scripts/check-release.mjs` refuses the run when the versions disagree, the tag
 does not match, the permission set changed, an action is not pinned to a commit
-SHA, or the package contains an unexpected file. Run it alone for the fast
-version; failures name the rule.
+SHA, an install script is not covered by the `allowScripts` policy, the
+downloaded host binary does not match its pinned digest, or the package contains
+an unexpected file. Run it alone for the fast version; failures name the rule.
 
 `.github/actions/verify` holds the test and package steps and is used by both CI
 and the release, so the two cannot drift. It is a composite action rather than a
@@ -151,6 +160,13 @@ gh attestation verify stream-profiles.ocpkg \
 ```
 
 `gh attestation` needs `gh` 2.49 or newer; the checksum check works anywhere.
+
+Attestation and the checksum describe the file the workflow sealed, and the
+workflow runs `owncast-plugin-test` — a downloaded native binary — before that
+sealing. `HOST_BINARY_SHA256` in `scripts/check-release.mjs` pins it so a
+replaced release asset becomes a failed check instead of a silent backdoor.
+When you bump `OWNCAST_PLUGIN_HOST_BINARIES_VERSION`, reinstall, confirm the new
+binary against the upstream release, and update the digest in the same commit.
 
 Adding a **permission** is user-visible: every installed copy shows "needs
 re-approval" until an admin approves. Update `EXPECTED_PERMISSIONS` in
@@ -218,6 +234,34 @@ Owncast's source rather than its docs:
   exactly the failure above. Salting stops a leaked digest being a direct
   lookup; the iteration count is a speed bump, not a KDF, so password strength
   still matters.
+* **A hashing parameter change is a migration, not a tweak.** Lowering `ROUNDS`
+  from 512 to 32 in `0.3.1` invalidated every stored digest and locked every
+  deployment out, including the owner login. Every record now stores `rounds`;
+  a record without one is ambiguous between the two releases and is tried at
+  both counts, current first, then rewritten at the current one. Do not default
+  an unlabelled record to a count — that labels a `0.3.1` record as legacy and
+  makes it permanently unverifiable.
+* **A failed sign-in must cost the same whether or not the username exists.**
+  The lookup hashes every salt and round count in force before comparing
+  anything, and an empty credential set still spends one hash against a fixed
+  salt. Returning early was a timing oracle that told an unauthenticated caller
+  which usernames were real.
+* **Every attempt is budgeted before it hashes.** A token bucket in KV (five per
+  site, three per username) keeps a burst inside the handler deadline. The
+  bucket state is written before the hash starts, so concurrent requests cannot
+  all pass the check while the first one runs. The bucket is not keyed on a
+  client address: the request carries none the caller cannot choose.
+* **Sign-in and sign-out are same-origin only.** Email clients, other sites and
+  prefetchers must not be able to submit the form or end a session. The primary
+  signal is `Sec-Fetch-Site`, which page script cannot forge; `Origin`/`Referer`
+  against `X-Forwarded-Host` is the fallback. Sign-out is a POST and the old GET
+  URL renders a confirmation page.
+* **Sign-out cannot revoke the binding.** `on_http_request` never receives the
+  `Cookie` header — the host deletes it before the handler runs — and
+  `endSession()` only clears the browser's copy, so a cookie copied beforehand
+  keeps working until the credential changes or the TTL ends. `req.user` is not
+  populated on these public routes either. Do not pretend otherwise in docs; the
+  CSRF fix is what removes the third-party trigger.
 * **A shared salt makes identical passwords identical hashes**, so matching must
   prefer an entry that names the viewer over a password-only one. `0.1.1` did
   not, and a password-only entry added earlier silently stood in for a named

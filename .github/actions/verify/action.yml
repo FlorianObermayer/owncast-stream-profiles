@@ -28,11 +28,17 @@ runs:
       shell: bash
       # The SDK's postinstall downloads the Owncast test/serve host binaries from
       # that project's GitHub releases. Pin the tag so a run cannot silently
-      # adopt a newly published binary: a bump becomes a reviewable diff.
+      # adopt a newly published binary: a bump becomes a reviewable diff. The
+      # binary is also checked against a pinned digest in scripts/check-release.mjs.
+      #
+      # strict-allow-scripts makes an install script that is not in package.json's
+      # `allowScripts` list fail the job instead of only warning, so an unreviewed
+      # dependency cannot run code in the job that builds the attested artifact.
       run: |
         echo "OWNCAST_PLUGIN_HOST_BINARIES_VERSION=v0.11.1" >> "$GITHUB_ENV"
         echo "NPM_CONFIG_FUND=false" >> "$GITHUB_ENV"
         echo "NPM_CONFIG_AUDIT=false" >> "$GITHUB_ENV"
+        echo "NPM_CONFIG_STRICT_ALLOW_SCRIPTS=true" >> "$GITHUB_ENV"
 
     - name: Set up Node
       uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -45,7 +51,17 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      run: npm ci
+      # package.json declares an `allowScripts` allowlist (npm RFC 868), but the
+      # field only exists from npm 11 onward. Node 22 bundles npm 10.9.x, which
+      # ignores it entirely, so `npm ci` would run every install script
+      # regardless and the allowlist would be decorative. Install the npm that
+      # reads it, and keep Node 22 so the `engines` floor stays under test as the
+      # comments above intend. strict-allow-scripts (set above) turns an
+      # unreviewed install script into a failed job rather than a warning.
+      run: |
+        npm install --global npm@11.19.1
+        npm --version
+        npm ci
 
     - name: Dependency audit
       shell: bash

@@ -24,6 +24,7 @@ const { definePlugin, owncast, authCheck } = require("@owncast/plugin-sdk");
 // base64/utf8Bytes are only used for the admin API's Basic header. Everything
 // else in ./auth backs the viewer gate.
 const {
+  ROUNDS,
   base64,
   utf8Bytes,
   findMatchingCredential,
@@ -31,7 +32,9 @@ const {
   newSalt,
   normalizeCredentials,
   parseBasicAuthorization,
+  roundsToTry,
   safeReturnTo,
+  sha256Hex,
   summarizeCredentials,
 } = require("./auth");
 
@@ -51,6 +54,28 @@ const ADMIN_SCOPE = "admin";
 // Which profile issued a viewer's session, so switching profiles revokes the
 // sessions of the old one instead of letting them ride along.
 const SESSION_PREFIX = "auth-session:";
+
+// Failed sign-in attempts are metered because each one hashes a password and
+// Owncast runs plugin handlers one at a time against a 5 s deadline. Overrunning
+// that deadline does not slow the request, it closes the module and leaves every
+// viewer -- and the owner login -- offline until an admin reloads the plugin.
+//
+// The budget is spent *before* any hashing, and the new state is written before
+// this returns, so a burst cannot all pass the check while the first hash is
+// still running. The bucket is global because the request carries no trustworthy
+// client address (only headers the caller chooses); a second bucket per submitted
+// username stops one account being ground down. Per-IP limiting belongs at the
+// reverse proxy; this is the ceiling that has to exist where the work happens.
+//
+// The burst is the real bound: at most that many hashes can queue behind each
+// other, a fraction of the 5 s deadline. A successful sign-in refunds its token,
+// so a viewer who types the password correctly never spends the site's budget.
+const ATTEMPT_KEY = "auth-attempt";
+const ATTEMPT_BURST = 8;
+const ATTEMPT_REFILL_MS = 10 * 1000;
+const ATTEMPT_USER_PREFIX = "auth-attempt-user:";
+const ATTEMPT_USER_BURST = 3;
+const ATTEMPT_USER_REFILL_MS = 60 * 1000;
 
 // Lifetime of a renewed session, in seconds. Owncast's default is 24 h and is
 // absolute: a viewer who never signs in again is dropped 24 h later even if
@@ -984,24 +1009,68 @@ function authenticate(auth, username, password) {
   const supplied = text(username);
   if (text(password) === "") return null;
 
-  const named = auth.entries.filter(function (entry) {
-    return entry.user !== "";
-  });
-  const exact = findMatchingCredential(named, supplied, password);
-  if (exact) return { entry: exact, admin: false };
+  // Every salt and round count in force is hashed, whatever username was
+  // supplied, so a failed attempt costs the same work whether the name exists
+  // or not. The candidate list below only decides which hashes are compared.
+  const work = [];
+  const seenWork = {};
 
-  if (auth.admin) {
-    const admin = findMatchingCredential([auth.admin], supplied, password);
-    if (admin) return { entry: admin, admin: true };
+  function addWork(entry) {
+    const counts = roundsToTry(entry);
+    for (let i = 0; i < counts.length; i += 1) {
+      const key = entry.salt + "|" + counts[i];
+      if (seenWork[key]) continue;
+      seenWork[key] = true;
+      work.push({ salt: entry.salt, rounds: counts[i] });
+    }
   }
 
-  const shared = auth.entries.filter(function (entry) {
-    return entry.user === "";
-  });
-  const wildcard = findMatchingCredential(shared, supplied, password);
-  if (wildcard) return { entry: wildcard, admin: false };
+  for (let i = 0; i < auth.entries.length; i += 1) addWork(auth.entries[i]);
+  if (auth.admin) addWork(auth.admin);
 
-  return null;
+  // Exact username matches are tried before the owner login, which is tried
+  // before password-only entries. Both are legitimate candidates, but an entry
+  // that names the viewer must win. Because a profile shares one salt, two
+  // entries with the same password have identical hashes, so without this
+  // ordering an earlier password-only entry would silently stand in and the
+  // viewer would appear in chat as "Guest" instead of their username.
+  const candidates = [];
+
+  for (let i = 0; i < auth.entries.length; i += 1) {
+    const entry = auth.entries[i];
+    if (entry.user !== "" && entry.user === supplied) {
+      candidates.push({ entry: entry, admin: false });
+    }
+  }
+
+  if (auth.admin && auth.admin.user === supplied) {
+    candidates.push({ entry: auth.admin, admin: true });
+  }
+
+  for (let i = 0; i < auth.entries.length; i += 1) {
+    const entry = auth.entries[i];
+    if (entry.user === "") candidates.push({ entry: entry, admin: false });
+  }
+
+  const match = findMatchingCredential(candidates, password, work);
+  if (match) persistUpgradedCredential(auth, match);
+  return match;
+}
+
+// A credential verified at an older count is re-hashed at the current one by
+// findMatchingCredential. Writing it back keeps that upgrade from being redone
+// on every later sign-in, and stamps the count so a future ROUNDS change can
+// migrate deliberately instead of locking everyone out.
+function persistUpgradedCredential(auth, match) {
+  const entry = match && match.entry;
+  if (!entry || entry.upgraded !== true) return;
+  delete entry.upgraded;
+
+  if (match.admin) {
+    saveAdminEntry(entry);
+    return;
+  }
+  saveCredentials(auth.profileId, auth.entries);
 }
 
 // scope is a profile id, or ADMIN_SCOPE. A stable, provider-free identity: one
@@ -1166,6 +1235,58 @@ function requestHeader(req, name) {
   return "";
 }
 
+// Host part of an absolute URL (scheme://host[:port]/...), without the URL API
+// the sandbox does not have.
+function urlHost(value) {
+  const lower = text(value).trim().toLowerCase();
+  const schemeEnd = lower.indexOf("://");
+  if (schemeEnd === -1) return "";
+
+  const rest = lower.slice(schemeEnd + 3);
+  const end = rest.search(/[/?#]/);
+  const authority = end === -1 ? rest : rest.slice(0, end);
+  const at = authority.lastIndexOf("@");
+  return at === -1 ? authority : authority.slice(at + 1);
+}
+
+// The public host, when a reverse proxy reports it. Go keeps the Host header
+// out of `r.Header`, and the host builds this plugin's request envelope from
+// `r.Header`, so `host` is normally absent. X-Forwarded-Host is the one
+// server-side value we can compare against.
+function publicHost(req) {
+  const forwarded = requestHeader(req, "x-forwarded-host");
+  const first = forwarded.split(",")[0].trim().toLowerCase();
+  if (first !== "") return first;
+  return requestHeader(req, "host").trim().toLowerCase();
+}
+
+// True when the request was issued by this site. Browsers set Sec-Fetch-Site,
+// which page script cannot forge: a cross-site form post is "cross-site" or
+// "same-site". A request with no Sec-Fetch-Site is not a browser form post --
+// curl, a player app, or a proxy that strips it -- so it falls back to comparing
+// Origin/Referer with X-Forwarded-Host when that is available. Requests with
+// neither browser header are allowed so scripted clients keep working.
+function isSameOrigin(req) {
+  const site = requestHeader(req, "sec-fetch-site").trim().toLowerCase();
+  if (site === "same-origin" || site === "none") return true;
+  if (site === "cross-site" || site === "same-site") return false;
+
+  const host = publicHost(req);
+
+  const origin = requestHeader(req, "origin");
+  if (origin !== "") {
+    if (origin.trim().toLowerCase() === "null") return false;
+    return host === "" || urlHost(origin) === host;
+  }
+
+  const referer = requestHeader(req, "referer");
+  if (referer !== "") {
+    return host === "" || urlHost(referer) === host;
+  }
+
+  return true;
+}
+
 // GET / — where the host sends an unauthenticated viewer. Every branch ends in
 // a session, a form, or an explanation; never a silent pass-through.
 function gateEntry(req) {
@@ -1210,8 +1331,18 @@ function gateEntry(req) {
     if (!credentials) {
       return plainResponse(401, "Expected HTTP Basic credentials.");
     }
+    // An empty password is rejected before the budget is touched: it costs no
+    // hash, so letting it spend a token would be a free way to drain the bucket.
+    if (text(credentials.password) === "") {
+      return plainResponse(401, "Invalid credentials.");
+    }
+    // This branch hashes a password too, so it spends from the same budget.
+    if (!reserveSignInAttempt(credentials.user)) {
+      return plainResponse(429, "Too many sign-in attempts. Wait a moment, then try again.");
+    }
     const match = authenticate(auth, credentials.user, credentials.password);
     if (!match) return plainResponse(401, "Invalid credentials.");
+    refundSignInAttempt(credentials.user);
     try {
       grantAccess(match.admin ? ADMIN_SCOPE : auth.profileId, match.entry);
     } catch (error) {
@@ -1226,6 +1357,69 @@ function gateEntry(req) {
   return htmlResponse(
     200,
     loginPage({ returnTo: returnTo, showUsername: showsUsernameField(auth) }),
+  );
+}
+
+// One attempt's worth of budget. A token bucket rather than a fixed window so a
+// viewer is not locked out for the whole window after one typo.
+function takeToken(key, burst, refillMs) {
+  const now = Date.now();
+  const stored = parseJson(owncast.kv.get(key));
+  let tokens = burst;
+  let at = now;
+
+  if (stored && typeof stored === "object") {
+    if (typeof stored.tokens === "number" && isFinite(stored.tokens)) tokens = stored.tokens;
+    if (typeof stored.at === "number" && isFinite(stored.at)) at = stored.at;
+  }
+
+  const refilled = Math.min(burst, tokens + Math.max(0, now - at) / refillMs);
+  const left = refilled >= 1 ? refilled - 1 : refilled;
+  owncast.kv.set(key, JSON.stringify({ tokens: left, at: now }));
+  return refilled >= 1;
+}
+
+// Returns a token after a successful sign-in, so a viewer who mistyped once
+// does not spend the site's budget.
+function refundToken(key, burst) {
+  const stored = parseJson(owncast.kv.get(key));
+  if (!stored || typeof stored !== "object") return;
+
+  const tokens = typeof stored.tokens === "number" && isFinite(stored.tokens) ? stored.tokens : 0;
+  const at = typeof stored.at === "number" && isFinite(stored.at) ? stored.at : Date.now();
+  owncast.kv.set(key, JSON.stringify({ tokens: Math.min(burst, tokens + 1), at: at }));
+}
+
+// Hashed so the KV key is a fixed, safe alphabet whatever the viewer typed.
+function usernameAttemptKey(username) {
+  return ATTEMPT_USER_PREFIX + sha256Hex(text(username).trim()).slice(0, 32);
+}
+
+// Reserves one attempt across both buckets. The username bucket is checked
+// first, so a name that is already exhausted does not also drain the site-wide
+// budget.
+function reserveSignInAttempt(username) {
+  if (!takeToken(usernameAttemptKey(username), ATTEMPT_USER_BURST, ATTEMPT_USER_REFILL_MS)) {
+    return false;
+  }
+  return takeToken(ATTEMPT_KEY, ATTEMPT_BURST, ATTEMPT_REFILL_MS);
+}
+
+function refundSignInAttempt(username) {
+  refundToken(usernameAttemptKey(username), ATTEMPT_USER_BURST);
+  refundToken(ATTEMPT_KEY, ATTEMPT_BURST);
+}
+
+// 429 rendered with the ordinary sign-in page, so a throttled viewer gets a
+// readable explanation instead of a bare status.
+function tooManyAttempts(returnTo, auth) {
+  return htmlResponse(
+    429,
+    loginPage({
+      returnTo: returnTo,
+      message: "Too many sign-in attempts. Wait a moment, then try again.",
+      showUsername: showsUsernameField(auth),
+    }),
   );
 }
 
@@ -1246,10 +1440,35 @@ function gateLogin(req) {
   const form = parseFormBody(req.body);
   const returnTo = safeReturnTo(form.return_to);
 
+  // Signing in is a state change, so another site must not be able to submit
+  // this form with the viewer's browser.
+  if (!isSameOrigin(req)) {
+    return htmlResponse(403, blockedPage("That sign-in did not come from this site."));
+  }
+
   // Nothing can authenticate: an open profile needs no password, and with no
   // profile and no admin credential the site is closed by gateEntry.
   if ((!auth.known || !auth.entries.length) && !auth.admin) {
     return redirectTo(returnTo);
+  }
+
+  // An empty password costs no hash, so it is refused before it can spend a
+  // token. authenticate() would also reject it; doing it here keeps the budget
+  // from being drained for free.
+  if (text(form.password) === "") {
+    return htmlResponse(
+      401,
+      loginPage({
+        returnTo: returnTo,
+        message: "That username and password do not match.",
+        showUsername: showsUsernameField(auth),
+      }),
+    );
+  }
+
+  // Metered before the hash, because the hash is the cost being abused.
+  if (!reserveSignInAttempt(form.user)) {
+    return tooManyAttempts(returnTo, auth);
   }
 
   const match = authenticate(auth, text(form.user), text(form.password));
@@ -1263,6 +1482,8 @@ function gateLogin(req) {
       }),
     );
   }
+
+  refundSignInAttempt(form.user);
 
   try {
     grantAccess(match.admin ? ADMIN_SCOPE : auth.profileId, match.entry);
@@ -1284,10 +1505,41 @@ function gateLogin(req) {
 }
 
 function gateLogout(req) {
+  // Signing out is a state change, so another site must not be able to end a
+  // viewer's session with a link, an image or a prefetch.
+  if (!isSameOrigin(req)) {
+    return htmlResponse(403, blockedPage("That sign-out did not come from this site."));
+  }
+
+  // `req.user` is absent on this plugin's own public routes, so this only
+  // revokes the server-side binding when the host supplies an identity. The
+  // host strips the Cookie header before the handler runs, which leaves no
+  // other way for the plugin to learn which binding to clear. endSession()
+  // still expires the browser's copy; see CONTRIBUTING.md for the constraint.
   const user = req.user;
   if (user && user.id) owncast.kv.set(SESSION_PREFIX + user.id, "");
   owncast.auth.endSession();
   return redirectTo("/");
+}
+
+// Signing out is a POST. The documented URL still works: it renders a
+// one-button confirmation instead of acting on the GET, so no other origin can
+// end a viewer's session with a top-level navigation.
+function logoutPage() {
+  return htmlResponse(
+    200,
+    "<!doctype html><meta charset=utf-8>" +
+      "<meta name=viewport content='width=device-width,initial-scale=1'>" +
+      "<title>Sign out</title>" +
+      "<body style='font:15px/1.5 system-ui,sans-serif;background:#0f0f14;color:#efeff1;" +
+      "display:grid;place-items:center;min-height:100vh;margin:0;text-align:center'>" +
+      "<form method=post action=/auth/logout style='max-width:26rem;padding:1.5rem'>" +
+      "<h1 style='font-size:1.1rem'>Sign out of this stream?</h1>" +
+      "<p style='color:#b6b3c6'>This browser will be signed out.</p>" +
+      "<button type=submit style='padding:.65rem 1rem;border:0;border-radius:8px;" +
+      "font:inherit;font-weight:600;color:#fff;background:#2087e2;cursor:pointer'>Sign out</button>" +
+      "</form></body>",
+  );
 }
 
 // The profile-independent admin credential. One at a time, so "set" replaces.
@@ -1327,6 +1579,7 @@ function adminAccessAction(body) {
     user: user,
     salt: salt,
     hash: hashPassword(password, salt),
+    rounds: ROUNDS,
   });
 
   owncast.log.info('stream-profiles: owner login set for "' + user + '"');
@@ -1377,6 +1630,7 @@ function authAdminAction(body) {
         user: user,
         salt: salt,
         hash: hashPassword(password, salt),
+        rounds: ROUNDS,
       },
     ]);
   } else if (action === "remove") {
@@ -1493,6 +1747,10 @@ module.exports = definePlugin({
     }
 
     if (req.method === "GET" && path === "/auth/logout") {
+      return logoutPage();
+    }
+
+    if (req.method === "POST" && path === "/auth/logout") {
       return gateLogout(req);
     }
 

@@ -65,6 +65,13 @@ jobs:
           STRIX_TELEMETRY: "0"
         run: |
           if [ -z "${LLM_API_KEY}" ] || [ -z "${STRIX_LLM}" ]; then
+            # A pull request cannot fix a missing repository secret, and a red
+            # check on every PR teaches people to ignore it. The scheduled run
+            # still fails, which is where the owner will notice.
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "::notice::Strix is not configured; skipping. Set the LLM_API_KEY secret and the STRIX_LLM variable."
+              exit 0
+            fi
             echo "::error::Set the LLM_API_KEY secret and the STRIX_LLM variable." >&2
             exit 1
           fi

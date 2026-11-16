@@ -163,6 +163,8 @@ gotchas:
 * **The endpoint must be reachable from GitHub**, so not a LAN-only gateway. A
   gateway model alias also isn't in LiteLLM's price catalogue, so cost reports as
   `0` and `--max-budget` never trips; set `STRIX_LLM_*_COST_PER_MTOK` if you use one.
+* **Unconfigured scan skips on pull requests**, because a PR author cannot add
+  the secret; the weekly run fails instead, so a missing key is still noticed.
 * **Findings never fail the job**, including the SARIF upload: an LLM scanner
   isn't deterministic, so gate on it only deliberately, with `--fail-on high`.
   Findings land in the **Security → Code scanning** tab instead.

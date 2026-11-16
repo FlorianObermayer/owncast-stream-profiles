@@ -3,7 +3,8 @@ name: AI security scan
 on:
   pull_request:
   schedule:
-    # Mondays, 04:00 UTC.
+    # Mondays, 04:00 UTC. Cron has no fortnightly expression, so this fires
+    # weekly and the gate job below skips odd ISO weeks.
     - cron: "0 4 * * 1"
   workflow_dispatch:
     inputs:
@@ -24,13 +25,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  fortnight:
+    name: Fortnight check
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.parity.outputs.run }}
+    steps:
+      - id: parity
+        run: |
+          # 10# forces base 10: the ISO week is zero-padded, and 08 is an
+          # invalid octal literal.
+          week=$((10#$(date -u +%V)))
+          if [ $((week % 2)) -eq 0 ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Off week (ISO week ${week}); the next run is in a week." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   scan:
     name: Strix
-    # Same-repository pull requests only. A fork's PR gets no secrets, and the
-    # scan reads its instruction file from the PR's own checkout.
+    needs: [fortnight]
+    # always() so a skipped gate (every non-scheduled run) does not skip the
+    # scan; its output is empty then, which is not the string "false".
+    # Same-repository PRs only: a fork's PR gets no secrets, and the scan reads
+    # its instruction file from the PR's own checkout.
     if: >-
-      github.event_name != 'pull_request' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+      always() &&
+      needs.fortnight.outputs.run != 'false' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
@@ -63,6 +88,9 @@ jobs:
           # Optional: only needed for a gateway or a non-default endpoint.
           LLM_API_BASE: ${{ vars.LLM_API_BASE }}
           STRIX_TELEMETRY: "0"
+          # Scheduled runs cover the whole source, so they go deeper than a
+          # diff-scoped pull request run.
+          SCAN_MODE: ${{ github.event_name == 'schedule' && 'standard' || inputs.scan-mode || 'quick' }}
         run: |
           if [ -z "${LLM_API_KEY}" ] || [ -z "${STRIX_LLM}" ]; then
             # A pull request cannot fix a missing repository secret, and a red
@@ -76,13 +104,13 @@ jobs:
             exit 1
           fi
           [ -n "${LLM_API_BASE}" ] || unset LLM_API_BASE
-          echo "Model: ${STRIX_LLM}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Model: ${STRIX_LLM}, mode: ${SCAN_MODE}" >> "$GITHUB_STEP_SUMMARY"
 
           # Pull requests are scanned diff-scoped: changed files against the
           # base branch, which is what keeps a quick run quick.
           args=(
             --target .
-            --scan-mode "${{ inputs.scan-mode || 'quick' }}"
+            --scan-mode "${SCAN_MODE}"
             --max-budget "${{ inputs.max-budget || '5' }}"
             --instruction-file .github/strix-instruction.md
           )

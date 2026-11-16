@@ -149,11 +149,13 @@ re-approval" until an admin approves. Update `EXPECTED_PERMISSIONS` in
 ## AI security scan
 
 `.github/workflows/strix.yml` runs the [strix](https://github.com/usestrix/strix)
-scanner on every pull request (diff-scoped), weekly, and on demand. It is
-provider-agnostic: set the `STRIX_LLM` variable to any LiteLLM model id and the
-`LLM_API_KEY` secret to that provider's key; `LLM_API_BASE` is optional. The
-gotchas:
+scanner on every pull request (diff-scoped, `quick`), every other Monday at
+04:00 UTC (`standard`), and on demand. It is provider-agnostic: set the
+`STRIX_LLM` variable to any LiteLLM model id and the `LLM_API_KEY` secret to
+that provider's key; `LLM_API_BASE` is optional. The gotchas:
 
+* **The schedule is fortnightly by parity, not by cron.** Cron has no 14-day
+  expression, so the workflow fires weekly and a gate job skips odd ISO weeks.
 * **Pull requests are scanned only when the branch is in this repository.** A
   fork's PR gets no secrets, so the job is skipped rather than left red. That
   guard also matters because the scan reads `.github/strix-instruction.md` from
@@ -164,7 +166,7 @@ gotchas:
   gateway model alias also isn't in LiteLLM's price catalogue, so cost reports as
   `0` and `--max-budget` never trips; set `STRIX_LLM_*_COST_PER_MTOK` if you use one.
 * **Unconfigured scan skips on pull requests**, because a PR author cannot add
-  the secret; the weekly run fails instead, so a missing key is still noticed.
+  the secret; the scheduled run fails instead, so a missing key is still noticed.
 * **Findings never fail the job**, including the SARIF upload: an LLM scanner
   isn't deterministic, so gate on it only deliberately, with `--fail-on high`.
   Findings land in the **Security → Code scanning** tab instead.

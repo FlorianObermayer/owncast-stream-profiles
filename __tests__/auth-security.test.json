@@ -108,7 +108,38 @@
     ]
   },
   {
-    "name": "a burst of failures against an unmigrated record is throttled by work, not count",
+    "name": "a drained sign-in budget refuses before hashing, even for a correct password",
+    "given": {
+      "kv": {
+        "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
+        "active-profile": "a",
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\"}]",
+        "auth-attempt": "{\"tokens\":0,\"at\":9999999999999}"
+      }
+    },
+    "events": [
+      {
+        "http": {
+          "method": "POST",
+          "path": "/auth/login",
+          "headers": {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          "body": "user=alice&password=secret",
+          "expect": {
+            "status": 429,
+            "bodyContains": "Too many sign-in attempts"
+          }
+        }
+      }
+    ],
+    "expect": {
+      "sessionGrants": [],
+      "userRegistrations": []
+    }
+  },
+  {
+    "name": "a typo does not block the next correct sign-in",
     "given": {
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
@@ -124,7 +155,7 @@
           "headers": {
             "Content-Type": "application/x-www-form-urlencoded"
           },
-          "body": "user=u1&password=wrong",
+          "body": "user=alice&password=wrong",
           "expect": {
             "status": 401
           }
@@ -137,39 +168,29 @@
           "headers": {
             "Content-Type": "application/x-www-form-urlencoded"
           },
-          "body": "user=u2&password=wrong",
+          "body": "user=alice&password=secret",
           "expect": {
-            "status": 401
-          }
-        }
-      },
-      {
-        "http": {
-          "method": "POST",
-          "path": "/auth/login",
-          "headers": {
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
-          "body": "user=u3&password=wrong",
-          "expect": {
-            "status": 429,
-            "bodyContains": "Too many sign-in attempts"
+            "status": 302
           }
         }
       }
     ],
     "expect": {
-      "sessionGrants": [],
-      "userRegistrations": []
+      "sessionGrants": [
+        {
+          "userId": "u-a:c1"
+        }
+      ]
     }
   },
   {
-    "name": "one username cannot be ground down",
+    "name": "a drained per-username budget refuses that name only",
     "given": {
       "kv": {
         "profiles": "[{\"id\":\"a\",\"name\":\"A\"}]",
         "active-profile": "a",
-        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\",\"rounds\":32}]"
+        "auth:a": "[{\"id\":\"c1\",\"user\":\"alice\",\"salt\":\"0123456789abcdef0123456789abcdef\",\"hash\":\"e415b834637f49eb1a4f2ef392c24361d5a791bd656d261e72161c9668c750d5\",\"rounds\":32}]",
+        "auth-attempt-user:2bd806c97f0e00af1a1fc3328fa763a9": "{\"tokens\":0,\"at\":9999999999999}"
       }
     },
     "events": [
@@ -180,49 +201,23 @@
           "headers": {
             "Content-Type": "application/x-www-form-urlencoded"
           },
-          "body": "user=alice&password=wrong",
-          "expect": {
-            "status": 401
-          }
-        }
-      },
-      {
-        "http": {
-          "method": "POST",
-          "path": "/auth/login",
-          "headers": {
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
-          "body": "user=alice&password=wrong",
-          "expect": {
-            "status": 401
-          }
-        }
-      },
-      {
-        "http": {
-          "method": "POST",
-          "path": "/auth/login",
-          "headers": {
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
-          "body": "user=alice&password=wrong",
-          "expect": {
-            "status": 401
-          }
-        }
-      },
-      {
-        "http": {
-          "method": "POST",
-          "path": "/auth/login",
-          "headers": {
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
-          "body": "user=alice&password=wrong",
+          "body": "user=alice&password=secret",
           "expect": {
             "status": 429,
             "bodyContains": "Too many sign-in attempts"
+          }
+        }
+      },
+      {
+        "http": {
+          "method": "POST",
+          "path": "/auth/login",
+          "headers": {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          "body": "user=carol&password=wrong",
+          "expect": {
+            "status": 401
           }
         }
       }

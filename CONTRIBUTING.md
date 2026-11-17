@@ -146,6 +146,25 @@ Adding a **permission** is user-visible: every installed copy shows "needs
 re-approval" until an admin approves. Update `EXPECTED_PERMISSIONS` in
 `scripts/check-release.mjs` in the same commit.
 
+## AI security scan
+
+`.github/workflows/strix.yml` runs [strix](https://github.com/usestrix/strix) on
+every pull request (diff-scoped, `quick`), monthly on the 1st (`standard`), and
+on demand.
+
+Set the `STRIX_CI_LLM` variable to any LiteLLM model id (e.g.
+`deepseek/deepseek-flash`) and the `STRIX_CI_LLM_API_KEY` secret to that
+provider's key. `STRIX_CI_LLM_API_BASE` is only needed for a gateway. The step
+maps them to the `STRIX_LLM` / `LLM_API_KEY` / `LLM_API_BASE` names strix reads.
+
+* Fork PRs are skipped: they get no secrets, and the scan reads its instruction
+  file from the PR checkout.
+* Never move it to a self-hosted runner while this repository is public.
+* Findings go to Security → Code scanning and never fail the job. Add
+  `--fail-on high` to gate on them.
+* A scan with no credentials skips on PRs and fails on the scheduled run.
+* It only sees source; attack the deployment separately.
+
 ## Publishing to the catalog
 
 Optional, and manual. Every Owncast install's **Browse** tab reads

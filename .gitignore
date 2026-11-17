@@ -11,6 +11,9 @@ build/
 # Release artifacts are attached to GitHub releases, not committed
 *.ocpkg
 
+# Output of an AI security scan (`npm`-less, written by the strix CLI)
+strix_runs/
+
 # Editor and OS noise
 .DS_Store
 *.log

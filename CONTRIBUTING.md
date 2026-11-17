@@ -148,32 +148,22 @@ re-approval" until an admin approves. Update `EXPECTED_PERMISSIONS` in
 
 ## AI security scan
 
-`.github/workflows/strix.yml` runs the [strix](https://github.com/usestrix/strix)
-scanner on every pull request (diff-scoped, `quick`), monthly on the 1st at 04:00
-UTC (`standard`), and on demand. It is provider-agnostic: set the `STRIX_CI_LLM`
-variable to any LiteLLM model id and the `STRIX_CI_LLM_API_KEY` secret to that
-provider's key; `STRIX_CI_LLM_API_BASE` is optional. Those three are namespaced
-in GitHub settings and mapped to the names strix reads (`STRIX_LLM`,
-`LLM_API_KEY`, `LLM_API_BASE`) in the step's `env`. The gotchas:
+`.github/workflows/strix.yml` runs [strix](https://github.com/usestrix/strix) on
+every pull request (diff-scoped, `quick`), monthly on the 1st (`standard`), and
+on demand.
 
-* **Pull requests are scanned only when the branch is in this repository.** A
-  fork's PR gets no secrets, so the job is skipped rather than left red. That
-  guard also matters because the scan reads `.github/strix-instruction.md` from
-  the PR's own checkout.
-* **Never a self-hosted runner** while this repository is public: a fork can edit
-  a workflow file and have that job run on your machine.
-* **The endpoint must be reachable from GitHub**, so not a LAN-only gateway. A
-  gateway model alias also isn't in LiteLLM's price catalogue, so cost reports as
-  `0` and `--max-budget` never trips; set `STRIX_LLM_*_COST_PER_MTOK` if you use one.
-* **Unconfigured scan skips on pull requests**, because a PR author cannot add
-  the secret; the scheduled run fails instead, so a missing key is still noticed.
-* **Findings never fail the job**, including the SARIF upload: an LLM scanner
-  isn't deterministic, so gate on it only deliberately, with `--fail-on high`.
-  Findings land in the **Security → Code scanning** tab instead.
-* **It only sees source.** The 2026-11 report's best findings came from attacking
-  the deployment with real credentials; do that by hand.
-* **`strix_runs/` stays out of commits**; CI uploads it as the `strix-run`
-  artifact.
+Set the `STRIX_CI_LLM` variable to any LiteLLM model id (e.g.
+`deepseek/deepseek-flash`) and the `STRIX_CI_LLM_API_KEY` secret to that
+provider's key. `STRIX_CI_LLM_API_BASE` is only needed for a gateway. The step
+maps them to the `STRIX_LLM` / `LLM_API_KEY` / `LLM_API_BASE` names strix reads.
+
+* Fork PRs are skipped: they get no secrets, and the scan reads its instruction
+  file from the PR checkout.
+* Never move it to a self-hosted runner while this repository is public.
+* Findings go to Security → Code scanning and never fail the job. Add
+  `--fail-on high` to gate on them.
+* A scan with no credentials skips on PRs and fails on the scheduled run.
+* It only sees source; attack the deployment separately.
 
 ## Publishing to the catalog
 

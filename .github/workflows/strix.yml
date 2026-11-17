@@ -3,7 +3,6 @@ name: AI security scan
 on:
   pull_request:
   schedule:
-    # First of the month, 04:00 UTC.
     - cron: "0 4 1 * *"
   workflow_dispatch:
     inputs:
@@ -26,8 +25,6 @@ concurrency:
 jobs:
   scan:
     name: Strix
-    # Same-repository PRs only: a fork's PR gets no secrets, and the scan reads
-    # its instruction file from the PR's own checkout.
     if: >-
       github.event_name != 'pull_request' ||
       github.event.pull_request.head.repo.full_name == github.repository
@@ -35,8 +32,6 @@ jobs:
     timeout-minutes: 90
     permissions:
       contents: read
-      # For the SARIF upload. `permissions` does not take expressions, so this
-      # is granted on every run; the token is never handed to the scan step.
       security-events: write
 
     steps:
@@ -48,43 +43,27 @@ jobs:
 
       - name: Install Strix
         run: |
-          python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)' || {
-            echo "strix-agent requires Python 3.12 or newer" >&2
-            python3 --version >&2
-            exit 1
-          }
           pipx install "strix-agent==1.7.0"
           strix --version
 
       - name: Run the scan
         env:
-          # Namespaced in GitHub settings as STRIX_CI_*, then mapped here to the
-          # names strix itself reads.
           STRIX_LLM: ${{ vars.STRIX_CI_LLM }}
           LLM_API_KEY: ${{ secrets.STRIX_CI_LLM_API_KEY }}
-          # Optional: only needed for a gateway or a non-default endpoint.
           LLM_API_BASE: ${{ vars.STRIX_CI_LLM_API_BASE }}
           STRIX_TELEMETRY: "0"
-          # Scheduled runs cover the whole source, so they go deeper than a
-          # diff-scoped pull request run.
           SCAN_MODE: ${{ github.event_name == 'schedule' && 'standard' || inputs.scan-mode || 'quick' }}
         run: |
           if [ -z "${LLM_API_KEY}" ] || [ -z "${STRIX_LLM}" ]; then
-            # A pull request cannot fix a missing repository secret, and a red
-            # check on every PR teaches people to ignore it. The scheduled run
-            # still fails, which is where the owner will notice.
             if [ "${{ github.event_name }}" = "pull_request" ]; then
-              echo "::notice::Strix is not configured; skipping. Set the STRIX_CI_LLM_API_KEY secret and the STRIX_CI_LLM variable."
+              echo "::notice::Strix is not configured; skipping."
               exit 0
             fi
             echo "::error::Set the STRIX_CI_LLM_API_KEY secret and the STRIX_CI_LLM variable." >&2
             exit 1
           fi
           [ -n "${LLM_API_BASE}" ] || unset LLM_API_BASE
-          echo "Model: ${STRIX_LLM}, mode: ${SCAN_MODE}" >> "$GITHUB_STEP_SUMMARY"
 
-          # Pull requests are scanned diff-scoped: changed files against the
-          # base branch, which is what keeps a quick run quick.
           args=(
             --target .
             --scan-mode "${SCAN_MODE}"
@@ -95,21 +74,17 @@ jobs:
             args+=(--scope-mode diff --diff-base "origin/${{ github.base_ref }}")
           fi
 
-          # 0 = no findings, 2 = findings, 1 = error. Only an error fails the job.
           set +e
           strix -n "${args[@]}"
           code=$?
           set -e
 
           echo "strix exited ${code}" >> "$GITHUB_STEP_SUMMARY"
-          if [ "${code}" -eq 1 ]; then
-            echo "::error::Strix could not complete. Check the key, the model id and the endpoint." >&2
-            exit 1
-          fi
+          [ "${code}" -eq 1 ] && exit 1
+          exit 0
 
       - name: Upload findings to code scanning
         if: github.event_name == 'pull_request' && hashFiles('strix_runs/**/*.sarif') != ''
-        # A malformed SARIF from an LLM scanner must not be what blocks a merge.
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@9418214df1f2c4b8128c770156c409013b07d6b9 # v3.39.3
         with:

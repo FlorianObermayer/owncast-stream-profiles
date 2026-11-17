@@ -318,10 +318,8 @@ function checkWorkflowsPinned() {
   }
 }
 
-// `allowScripts` in package.json is only read by npm 11 and later, and even
-// there it only warns unless strict mode is on. The build job therefore has to
-// install a newer npm and set NPM_CONFIG_STRICT_ALLOW_SCRIPTS, or the allowlist
-// silently protects nothing in the very job that builds the attested artifact.
+// `allowScripts` is only read by npm 11+, and only warns unless strict mode is
+// on; the build job must do both for the allowlist to block anything.
 function checkInstallScriptPolicy() {
   const relative = ".github/actions/verify/action.yml";
   const absolute = join(ROOT, relative);
@@ -551,9 +549,9 @@ function checkPasswordHashing() {
     fail("src/auth.js hashes ignore the salt");
   }
 
-  // The round count is part of the stored verifier. A record written at the
-  // legacy count must still verify, be upgraded, and be marked so the caller
-  // can persist it; an explicit count must be authoritative.
+  // The round count is part of the stored verifier: a record written at the
+  // legacy count must verify and be upgraded, and a stored count is
+  // authoritative.
   const salt = "0123456789abcdef0123456789abcdef";
   const legacy = {
     id: "legacy",
@@ -690,21 +688,12 @@ function checkAssetCacheBusting(manifestVersion) {
 // ---------------------------------------------------------------------------
 // Host binaries
 //
-// `npm test` and `npm run package` execute owncast-plugin-test, a native binary
-// the SDK's postinstall downloads from a GitHub release asset. That download has
-// no digest, signature or attestation, and the binary runs with the runner's
-// full privileges *before* the .ocpkg is built, hashed and attested. It could
-// therefore rewrite the bundle, the manifest or the sources that are packaged
-// next, and the published checksums and provenance would still verify.
-//
-// Pinning the digest turns "trust whatever the release asset served today" into
-// a value that changes only through a reviewable diff, the same way the tag pin
-// in .github/actions/verify/action.yml does. Confirm a bump against the upstream
-// release before changing this value.
+// The downloaded owncast-plugin-test binary runs before the package is sealed,
+// so digest pinning is the only thing tying the shipped bytes to a known file.
 // ---------------------------------------------------------------------------
 
 // sha256 of node_modules/@owncast/plugin-sdk/bin/.cache/owncast-plugin-test for
-// host-binary version v0.11.1 (the tag pinned in the verify action).
+// the host-binary tag pinned in .github/actions/verify/action.yml.
 const HOST_BINARY_SHA256 =
   "c75c8fdf642c0c402748723d9e7549025b3e2ee2eac146e4523af1b1f668d4f7";
 
@@ -740,15 +729,8 @@ function checkHostBinaries() {
 // ---------------------------------------------------------------------------
 // Sign-in budget
 //
-// The site-wide attempt budget is counted in hash rounds. Two things must stay
-// true or the denial-of-service fix silently stops bounding anything:
-//
-//   * one worst-case attempt fits inside the budget. The realistic worst case is
-//     the active profile plus the owner login, both written before records
-//     carried a count, so both are verified at LEGACY_ROUNDS and ROUNDS.
-//   * the budget is small enough that a queued burst stays well inside the 5 s
-//     handler deadline. 0.3.1 was measured at roughly 1.1 ms per round, so the
-//     ceiling below works out to under 2 s of hashing.
+// The budget is counted in hash rounds, so it needs to fit the most expensive
+// attempt and still stay inside the handler deadline.
 // ---------------------------------------------------------------------------
 
 const MAX_QUEUED_ROUNDS = 2400;

@@ -58,10 +58,12 @@ jobs:
 
       - name: Run the scan
         env:
-          STRIX_LLM: ${{ vars.STRIX_LLM }}
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          # Namespaced in GitHub settings as STRIX_CI_*, then mapped here to the
+          # names strix itself reads.
+          STRIX_LLM: ${{ vars.STRIX_CI_LLM }}
+          LLM_API_KEY: ${{ secrets.STRIX_CI_LLM_API_KEY }}
           # Optional: only needed for a gateway or a non-default endpoint.
-          LLM_API_BASE: ${{ vars.LLM_API_BASE }}
+          LLM_API_BASE: ${{ vars.STRIX_CI_LLM_API_BASE }}
           STRIX_TELEMETRY: "0"
           # Scheduled runs cover the whole source, so they go deeper than a
           # diff-scoped pull request run.
@@ -72,10 +74,10 @@ jobs:
             # check on every PR teaches people to ignore it. The scheduled run
             # still fails, which is where the owner will notice.
             if [ "${{ github.event_name }}" = "pull_request" ]; then
-              echo "::notice::Strix is not configured; skipping. Set the LLM_API_KEY secret and the STRIX_LLM variable."
+              echo "::notice::Strix is not configured; skipping. Set the STRIX_CI_LLM_API_KEY secret and the STRIX_CI_LLM variable."
               exit 0
             fi
-            echo "::error::Set the LLM_API_KEY secret and the STRIX_LLM variable." >&2
+            echo "::error::Set the STRIX_CI_LLM_API_KEY secret and the STRIX_CI_LLM variable." >&2
             exit 1
           fi
           [ -n "${LLM_API_BASE}" ] || unset LLM_API_BASE

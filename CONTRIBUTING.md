@@ -150,9 +150,11 @@ re-approval" until an admin approves. Update `EXPECTED_PERMISSIONS` in
 
 `.github/workflows/strix.yml` runs the [strix](https://github.com/usestrix/strix)
 scanner on every pull request (diff-scoped, `quick`), monthly on the 1st at 04:00
-UTC (`standard`), and on demand. It is provider-agnostic: set the `STRIX_LLM`
-variable to any LiteLLM model id and the `LLM_API_KEY` secret to that provider's
-key; `LLM_API_BASE` is optional. The gotchas:
+UTC (`standard`), and on demand. It is provider-agnostic: set the `STRIX_CI_LLM`
+variable to any LiteLLM model id and the `STRIX_CI_LLM_API_KEY` secret to that
+provider's key; `STRIX_CI_LLM_API_BASE` is optional. Those three are namespaced
+in GitHub settings and mapped to the names strix reads (`STRIX_LLM`,
+`LLM_API_KEY`, `LLM_API_BASE`) in the step's `env`. The gotchas:
 
 * **Pull requests are scanned only when the branch is in this repository.** A
   fork's PR gets no secrets, so the job is skipped rather than left red. That

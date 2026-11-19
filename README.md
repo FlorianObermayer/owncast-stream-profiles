@@ -1,7 +1,9 @@
 # Stream Profiles
 
+[![vibe coded - partially reviewed](https://img.shields.io/static/v1?label=vibe%20coded&message=partially%20reviewed&labelColor=24292f&color=bf8700)](#ai-disclosure) [![deepseek-flash](https://img.shields.io/static/v1?label=&message=deepseek-flash&labelColor=4d6bfe&color=4d6bfe&logo=deepseek&logoColor=white)](#ai-disclosure)
+
 An Owncast plugin that saves the settings describing a broadcast as a named
-profile, and switches between them in one click — title, About text, messages,
+profile, and switches between them in one click - title, About text, messages,
 page content, tags, discovery flags, chat policy and branding.
 
 Requires Owncast `0.3.0` or newer.
@@ -11,8 +13,8 @@ Requires Owncast `0.3.0` or newer.
 The plugin groups its fields into Content, Discoverability, Chat, Advanced and
 Branding.
 
-Each profile can also carry its own **viewer access** list — usernames with
-passwords, or shared passwords with no username — so switching profile switches
+Each profile can also carry its own **viewer access** list - usernames with
+passwords, or shared passwords with no username - so switching profile switches
 who is allowed to watch. Passwords are never stored or shown in readable form.
 
 One login is deliberately **not** tied to a profile: an owner login (no extra
@@ -21,7 +23,7 @@ none is. It exists so a mistake in a profile's access list cannot lock the owner
 out.
 
 Viewers sign in on a page rather than through a browser dialog, so a player app
-cannot use it. What the sign-in protects — the page only, or the video too — is
+cannot use it. What the sign-in protects - the page only, or the video too - is
 Owncast's own **Authentication** setting, and the default leaves the video
 public. See [INSTRUCTIONS.md](INSTRUCTIONS.md).
 
@@ -30,7 +32,7 @@ public. See [INSTRUCTIONS.md](INSTRUCTIONS.md).
 Download `stream-profiles.ocpkg` from the repository's Releases page, then in the
 Owncast admin: **Plugins → Upload plugin**, review the permissions, enable it.
 
-Optionally verify the download first — compare it against `SHA256SUMS.txt` from
+Optionally verify the download first - compare it against `SHA256SUMS.txt` from
 the same release, or check its signed provenance with the `gh` CLI:
 
 ```bash
@@ -48,7 +50,7 @@ settings** to import what the server already uses into your first profile.
 
 The viewer access list is optional and empty by default, and an empty list on an
 **active** profile leaves the site open. With no profile active at all the site
-stays closed to viewers, so apply a profile before enabling the plugin — the
+stays closed to viewers, so apply a profile before enabling the plugin - the
 admin pages stay reachable either way. See [INSTRUCTIONS.md](INSTRUCTIONS.md) for
 the full behaviour.
 

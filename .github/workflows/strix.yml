@@ -47,6 +47,7 @@ jobs:
           strix --version
 
       - name: Run the scan
+        id: scan
         env:
           STRIX_LLM: ${{ vars.STRIX_CI_LLM }}
           LLM_API_KEY: ${{ secrets.STRIX_CI_LLM_API_KEY }}
@@ -81,14 +82,50 @@ jobs:
           set -e
 
           echo "strix exited ${code}" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${code}" -eq 0 ] || [ "${code}" -eq 2 ]; then
+            if python3 - <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          run_files = sorted(Path("strix_runs").glob("**/run.json"))
+          if not run_files:
+              print("::error::Strix produced no run record; scan completion cannot be verified.")
+              raise SystemExit(1)
+
+          for run_file in run_files:
+              try:
+                  run = json.loads(run_file.read_text(encoding="utf-8"))
+              except (OSError, json.JSONDecodeError) as error:
+                  print(f"::error file={run_file}::Could not read Strix run record: {error}")
+                  raise SystemExit(1)
+
+              if not isinstance(run, dict):
+                  print(f"::error file={run_file}::Strix run record is not an object.")
+                  raise SystemExit(1)
+
+              scan_results = run.get("scan_results")
+              if run.get("status") != "completed" or not isinstance(scan_results, dict) or scan_results.get("scan_completed") is not True:
+                  print(f"::error file={run_file}::Strix run did not complete.")
+                  raise SystemExit(1)
+          PY
+            then
+              echo "scan_completed=true" >> "$GITHUB_OUTPUT"
+            else
+              code=1
+            fi
+          fi
+
           exit "${code}"
 
       - name: Keep only results code scanning can display
-        if: always() && github.event_name == 'pull_request' && hashFiles('strix_runs/**/*.sarif') != ''
+        id: filter_sarif
+        if: always() && steps.scan.outputs.scan_completed == 'true' && hashFiles('strix_runs/**/*.sarif') != ''
         run: node scripts/sarif-for-code-scanning.mjs strix_runs "$RUNNER_TEMP/code-scanning"
 
       - name: Upload findings to code scanning
-        if: always() && github.event_name == 'pull_request' && hashFiles('strix_runs/**/*.sarif') != ''
+        if: always() && steps.scan.outputs.scan_completed == 'true' && steps.filter_sarif.outcome == 'success' && hashFiles('strix_runs/**/*.sarif') != ''
         uses: github/codeql-action/upload-sarif@9418214df1f2c4b8128c770156c409013b07d6b9 # v3.39.3
         with:
           sarif_file: ${{ runner.temp }}/code-scanning

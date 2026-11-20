@@ -7,7 +7,7 @@
 //   node scripts/sarif-for-code-scanning.mjs strix_runs "$RUNNER_TEMP/code-scanning"
 
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 
 const [from, to] = process.argv.slice(2);
 if (!from || !to) {
@@ -23,12 +23,9 @@ function sarifFiles(directory) {
   });
 }
 
-mkdirSync(to, { recursive: true });
-
 let kept = 0;
 let total = 0;
-
-for (const file of sarifFiles(from)) {
+const outputFiles = sarifFiles(from).map((file) => {
   const log = JSON.parse(readFileSync(file, "utf8"));
   for (const run of log.runs ?? []) {
     const results = run.results ?? [];
@@ -38,8 +35,15 @@ for (const file of sarifFiles(from)) {
     );
     kept += run.results.length;
   }
-  // Keep the run directory in the name: several scans can share one input.
-  writeFileSync(join(to, relative(from, file).replace(/[\\/]/g, "-")), JSON.stringify(log));
+  return {
+    path: join(to, relative(from, file)),
+    content: JSON.stringify(log),
+  };
+});
+
+for (const outputFile of outputFiles) {
+  mkdirSync(dirname(outputFile.path), { recursive: true });
+  writeFileSync(outputFile.path, outputFile.content);
 }
 
 console.log(`kept ${kept} of ${total} results (${total - kept} have no physical location)`);

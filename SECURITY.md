@@ -49,3 +49,20 @@ Two controls are worth knowing about when you report something:
   which a reverse proxy has to set for that comparison to mean anything. A
   proxy that strips all of those headers leaves scripted and older clients
   allowed rather than breaking sign-in for them.
+* **Plugin admin pages share one origin, so browser storage is not isolated.**
+  Owncast serves every plugin's admin page from the same origin, in a
+  same-origin iframe, and `sessionStorage`/`localStorage` are scoped per origin
+  rather than per plugin. Anything one plugin's page writes can be read,
+  overwritten or deleted by another plugin's admin page open in the same tab.
+  Treat browser storage in a plugin page as shared with every plugin you have
+  open. This page keeps the admin password in page memory instead, so a reload
+  asks for it again.
+* **The plugin runtime exposes no cryptographic library.** The plugin runs in
+  Owncast's embedded QuickJS interpreter, where the SDK is the only importable
+  module: there is no WebCrypto, no Node `crypto`, and no secure random source.
+  Password hashing is therefore hand-written: salted SHA-256 with a fixed
+  iteration count, sized so one check stays inside the host's request deadline.
+  Salts are unique per credential but built from `Math.random`, the clock and a
+  counter, because a CSPRNG is not reachable. This is weaker than a memory-hard
+  KDF; it protects against readable passwords in Owncast's database and
+  backups, not against an offline attack on a database an attacker already has.

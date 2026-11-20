@@ -271,12 +271,12 @@
     defaultResets: { favicon: false, logo: false },
   };
 
-  // The admin password is never sent to the plugin for storage. It is cached
-  // in sessionStorage only when the admin ticks "keep it in this browser tab",
-  // so it dies with the tab. Same-origin script could read it, but that is the
-  // same trust boundary as the admin UI itself: an XSS there already owns the
-  // session. Nothing here writes it to Owncast's database.
-  const PASSWORD_KEY = "stream-profiles:admin-password";
+  // The admin password is never sent to the plugin for storage and never
+  // written to browser storage: plugin admin pages are same-origin iframes, so
+  // sessionStorage and localStorage are shared with any other plugin page open
+  // in this tab. A closure variable is not part of that shared surface and dies
+  // with the page.
+  let passwordCache = "";
 
   let dirty = false;
   let busy = false;
@@ -308,7 +308,6 @@
     dialogReason: document.getElementById("password-reason"),
     dialogError: document.getElementById("password-error"),
     passwordInput: document.getElementById("password-input"),
-    passwordRemember: document.getElementById("password-remember"),
     passwordCancel: document.getElementById("password-cancel"),
   };
 
@@ -317,28 +316,15 @@
   // -------------------------------------------------------------------------
 
   function cachedPassword() {
-    try {
-      return window.sessionStorage.getItem(PASSWORD_KEY) || "";
-    } catch (error) {
-      // Storage can be blocked in a sandboxed frame; fall back to prompting.
-      return "";
-    }
+    return passwordCache;
   }
 
   function cachePassword(password) {
-    try {
-      window.sessionStorage.setItem(PASSWORD_KEY, password);
-    } catch (error) {
-      // Ignore: the password still works for this call.
-    }
+    passwordCache = password;
   }
 
   function forgetPassword() {
-    try {
-      window.sessionStorage.removeItem(PASSWORD_KEY);
-    } catch (error) {
-      // Nothing to clear.
-    }
+    passwordCache = "";
   }
 
   // Resolves with the entered password, or "" when the admin cancels.
@@ -353,7 +339,6 @@
     els.dialogError.hidden = true;
     els.dialogError.textContent = "";
     els.passwordInput.value = "";
-    els.passwordRemember.checked = true;
 
     if (typeof els.dialog.showModal === "function") {
       els.dialog.showModal();
@@ -1893,8 +1878,7 @@
       return;
     }
 
-    if (els.passwordRemember.checked) cachePassword(password);
-    else forgetPassword();
+    cachePassword(password);
 
     closePasswordDialog(password);
   });

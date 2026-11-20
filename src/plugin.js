@@ -13,7 +13,7 @@
 // this plugin makes: it needs the admin password per request and `network.fetch`.
 //
 // The password is never read from config and never written to storage. The
-// admin page asks for it, optionally caches it in the browser's sessionStorage,
+// admin page asks for it, holds it in memory for as long as the page is open,
 // and sends it with each request that needs it. Nothing here logs it.
 //
 // Every endpoint below takes { value: ... } under /api/admin and replies with

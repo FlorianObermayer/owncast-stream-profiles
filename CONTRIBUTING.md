@@ -188,8 +188,9 @@ serving `GET /plugins` and `GET /plugins/<slug>` with
 
 ## Conventions
 
-* Plain ES2020. The plugin runs in a sandboxed interpreter, not Node: no `fetch`,
-  no `btoa`, no filesystem, no `require` beyond the SDK. Use `owncast.*`.
+* Plain ES2020. The plugin runs in a sandboxed interpreter, not Node: no
+  `fetch`, no `btoa`, no filesystem, no crypto, no `require` beyond the SDK.
+  Use `owncast.*`.
 * The admin page has no build step on purpose. Keep it three static files.
 * Comments explain *why*. Restating the code is noise.
 * No new runtime dependency without a reason: each is a supply-chain surface.

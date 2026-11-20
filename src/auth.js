@@ -272,15 +272,22 @@ function hashPassword(password, salt, rounds) {
 }
 
 // Uniqueness is what a salt needs; unpredictability is not. The sandbox has no
-// CSPRNG, so this mixes the clock, a counter and Math.random. It deliberately
-// does no hashing: a salt is generated once per credential, and spending a
-// password hash on it would double the cost of adding one.
+// CSPRNG and no `require` beyond the SDK, so a Node `crypto.randomBytes` fix is
+// not available here (CodeQL js/insecure-randomness flags Math.random for this
+// reason and the alert is dismissed). This mixes the clock, a counter and
+// Math.random. It deliberately does no hashing: a salt is generated once per
+// credential, and spending a password hash on it would double the cost of
+// adding one.
 let saltCounter = 0;
 function newSalt() {
   let out = "";
+  const started = Date.now();
   while (out.length < 32) {
     saltCounter += 1;
-    out += Math.random().toString(36).slice(2) + saltCounter.toString(36);
+    out +=
+      Math.random().toString(36).slice(2) +
+      saltCounter.toString(36) +
+      (started + saltCounter).toString(36);
   }
   return out.slice(0, 32);
 }

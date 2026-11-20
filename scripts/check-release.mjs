@@ -46,6 +46,7 @@ const REQUIRED_FILES = [
   "CONTRIBUTING.md",
   "SECURITY.md",
   "scripts/check-release.mjs",
+  "scripts/sarif-for-code-scanning.mjs",
   "scripts/set-version.mjs",
   ".github/workflows/ci.yml",
   ".github/workflows/release.yml",

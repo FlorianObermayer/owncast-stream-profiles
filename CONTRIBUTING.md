@@ -34,6 +34,7 @@ version there in the same commit as the dependency.
 | `icon.png` / `icon.svg` | Plugin badge |
 | `__tests__/` | Scenario tests |
 | `scripts/check-release.mjs` | Release and security guard |
+| `scripts/sarif-for-code-scanning.mjs` | Strips SARIF results code scanning rejects |
 | `scripts/set-version.mjs` | Bumps the version in all four files at once |
 | `.github/actions/verify/action.yml` | Test and package steps, shared by CI and the release |
 | `.github/images/` | Screenshots for the README |
@@ -160,8 +161,10 @@ maps them to the `STRIX_LLM` / `LLM_API_KEY` / `LLM_API_BASE` names strix reads.
 * Fork PRs are skipped: they get no secrets, and the scan reads its instruction
   file from the PR checkout.
 * Never move it to a self-hosted runner while this repository is public.
-* Findings go to Security → Code scanning and never fail the job. Add
-  `--fail-on high` to gate on them.
+* The scan must complete; high and critical findings fail the job.
+* Only findings reach code scanning: one result without a file location fails
+  the whole upload, and Strix's coverage entries have none. They stay in the
+  `strix-run` artifact.
 * A scan with no credentials skips on PRs and fails on the scheduled run.
 * It only sees source; attack the deployment separately.
 
